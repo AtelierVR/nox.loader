@@ -1,0 +1,6 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <ui:VisualElement style="height: 50px; background-image: resource(&apos;Nox.CCK.Banner&apos;); align-items: stretch; justify-content: space-around; flex-direction: row;">
+        <ui:Label text="Player Loop" style="-unity-font-definition: url(&quot;project://database/Assets/Mods/api.nox.main/assets/api.nox.main/fonts/Funnel_Display/static/FunnelDisplay-SemiBold.ttf?fileID=12800000&amp;guid=7d12c2932f87aa449bb790924d6e533c&amp;type=3#FunnelDisplay-SemiBold&quot;); color: rgb(239, 239, 239); text-shadow: 0 4px 4px rgba(0, 0, 0, 0.25); flex-grow: 1; flex-shrink: 1; margin-top: 8px; margin-right: 8px; margin-bottom: 8px; margin-left: 8px; -unity-text-align: middle-left; white-space: normal; text-overflow: ellipsis;" />
+        <ui:VisualElement style="background-image: resource(&apos;Nox.CCK.Icon&apos;); flex-grow: 0; flex-shrink: 1; width: auto; height: auto; -unity-background-scale-mode: scale-to-fit; margin-top: 8px; margin-right: 8px; margin-bottom: 8px; margin-left: 8px; padding-top: 8px; padding-right: 8px; padding-bottom: 8px; padding-left: 8px;" />
+    </ui:VisualElement>
+</ui:UXML>

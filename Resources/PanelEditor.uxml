@@ -1,0 +1,20 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <Style src="project://database/Packages/api.nox.mod_loader/Resources/Editor.uss?fileID=7433441132597879392&amp;guid=97121ae1f0c384644a21a5c0e1ef6ee1&amp;type=3#Editor" />
+    <uie:Toolbar>
+        <ui:VisualElement class="container" style="flex-grow: 1; flex-direction: row;">
+            <uie:ToolbarMenu text="Menu" />
+            <uie:ToolbarSpacer style="flex-grow: 1;" />
+            <ui:VisualElement name="options" style="flex-grow: 0;">
+                <uie:ToolbarButton text="Button" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </uie:Toolbar>
+    <uie:Toolbar>
+        <ui:VisualElement class="container" style="flex-grow: 1;">
+            <uie:ToolbarBreadcrumbs style="flex-grow: 1;" />
+        </ui:VisualElement>
+    </uie:Toolbar>
+    <ui:ScrollView name="scroll_container" style="flex-grow: 1;">
+        <ui:GroupBox name="container" class="container" />
+    </ui:ScrollView>
+</ui:UXML>

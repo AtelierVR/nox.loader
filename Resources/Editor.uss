@@ -1,0 +1,27 @@
+:root {
+}
+
+#options > * {
+    flex-grow: 1;
+}
+
+.container {
+    max-width: 512px;
+    margin-right: auto;
+    margin-left: auto;
+    width: 512px;
+}
+
+#scroll_container > * > * > .unity-scroll-view__content-container {
+    flex-grow: 1;
+}
+
+#container {
+    min-height: 100%;
+    padding-top: 0;
+    padding-right: 0;
+    padding-bottom: 0;
+    padding-left: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+}

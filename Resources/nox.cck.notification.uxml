@@ -1,0 +1,12 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <Style src="project://database/Packages/api.nox.mod_loader/Resources/nox.cck.style.uss?fileID=7433441132597879392&amp;guid=ee18ab989d89a1a479332bd224e51c94&amp;type=3#nox.cck.style" />
+    <ui:VisualElement class="notification">
+        <ui:VisualElement class="icon-container">
+            <ui:VisualElement name="icon" class="icon" />
+        </ui:VisualElement>
+        <ui:VisualElement style="flex-grow: 1; justify-content: center;">
+            <ui:VisualElement name="content" style="-unity-text-align: middle-left;" />
+        </ui:VisualElement>
+        <ui:VisualElement name="actions" class="actions" />
+    </ui:VisualElement>
+</ui:UXML>
