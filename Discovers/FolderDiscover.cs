@@ -44,7 +44,7 @@ namespace Nox.ModLoader.Discovers {
 		public ModMetadata[] FindAllPackages() {
 			List<ModMetadata> packages = new();
 
-			Logger.LogDebug($"Finding folder mods in {PackageFolders.Length} folder(s):");
+			Logger.LogDebug($"Finding folder mods in {PackageFolders.Length} folder(s): {(PackageFolders.Length == 0 ? "Skipped" : "")}");
 			foreach (var folder in PackageFolders)
 				Logger.LogDebug($" - {folder}");
 

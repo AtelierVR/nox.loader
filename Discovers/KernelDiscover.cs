@@ -98,7 +98,7 @@ namespace Nox.ModLoader.Discovers {
 				.FirstOrDefault();
 			if (asmdef == null) return null;
 			var noxmod = Directory
-				.GetFiles(Path.GetDirectoryName(asmdef), "nox.mod.json*", SearchOption.TopDirectoryOnly)
+				.GetFiles(Path.GetDirectoryName(asmdef) ?? string.Empty, "nox.mod.json*", SearchOption.TopDirectoryOnly)
 				.FirstOrDefault();
 			if (noxmod == null) return null;
 			var noxobj = ModMetadata.LoadFromPath(noxmod);
