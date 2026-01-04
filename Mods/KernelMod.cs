@@ -7,8 +7,13 @@ using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.ModLoader.Mods {
 	public class KernelMod : Mod {
+		public const string MOD_FOLDER_TYPE = "kernel";
+
 		internal Assembly[] Assemblies;
-		internal AppDomain  Domain;
+		internal AppDomain Domain;
+
+		public override string GetModType()
+			=> MOD_FOLDER_TYPE;
 
 		public override AppDomain GetAppDomain()
 			=> Domain;
@@ -33,22 +38,24 @@ namespace Nox.ModLoader.Mods {
 
 			var reference = Metadata.GetReferences()
 				.Where(i => i.IsCompatible());
-			
+
+			// Retrieve all entrypoints to detect corresponding assemblies
+			var namespaces = Metadata.GetEntryPoints().GetAll()
+				.SelectMany(e => e.Value)
+				.Select(e =>
+				{
+					// Extract namespace from entrypoint (e.g. "Nox.Control.Main" -> "Nox.Control")
+					var lastDot = e.LastIndexOf('.');
+					return lastDot > 0 ? e[..lastDot] : e;
+				})
+				.Distinct();
+
 			Domain = AppDomain.CurrentDomain;
 			Assemblies = Domain.GetAssemblies()
-				.Where(
-					a => a.GetName().Name       == Metadata.GetId()
-						|| a.GetName().FullName == Metadata.GetId()
-						|| a.FullName           == Metadata.GetId()
-						|| reference.Any(
-							r => r.GetNamespace()   == a.GetName().Name
-								|| r.GetNamespace() == a.GetName().FullName
-								|| r.GetNamespace() == a.FullName
-						)
-				)
+				.Where(a => namespaces.Contains(a.GetName().Name))
 				.ToArray();
-			
-			if(!await AssetAPI.RegisterAssets())
+
+			if (!await AssetAPI.RegisterAssets())
 				return false;
 
 			return await base.Load();

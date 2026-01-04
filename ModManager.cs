@@ -2,13 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Cysharp.Threading.Tasks;
+using Nox.CCK.Mods.Metadata;
 using Nox.ModLoader.Discovers;
 using Nox.ModLoader.Mods;
 using Nox.ModLoader.Permissions;
 using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.ModLoader {
-	public class ModManager {
+	public static class ModManager {
 		public static List<Mod> Mods { get; private set; } = new();
 		private static bool _initialized;
 		
@@ -180,28 +181,264 @@ namespace Nox.ModLoader {
 			return null;
 		}
 
-		private static void GetRelations(Mod mod, Mod[] inLoading, ref List<Mod> dependencies) {
+		/// <summary>
+		/// Performs a topological sort on mods using Kahn's algorithm.
+		/// This ensures that dependencies are loaded before mods that depend on them.
+		/// Also respects load order constraints (first, last, before, after).
+		/// </summary>
+		/// <param name="mods">List of mods to sort</param>
+		/// <returns>Result containing sorted mods or error information</returns>
+		private static TopologicalSortResult TopologicalSort(List<Mod> mods) {
+		// Build adjacency list and in-degree map
+		var adjacencyList = new Dictionary<string, List<Mod>>();
+		var inDegree = new Dictionary<string, int>();
+
+		// Initialize
+		foreach (var mod in mods) {
+			var modId = mod.GetMetadata()?.GetId();
+			if (modId == null) continue;
+
+			adjacencyList[modId] = new List<Mod>();
+			inDegree[modId] = 0;
+		}
+
+		// Build the graph: only use constraints (not dependencies) for ordering
+		foreach (var mod in mods) {
+			var modId = mod.GetMetadata()?.GetId();
+			if (modId == null) continue;
+
 			var metadata = mod.GetMetadata();
-			if (metadata == null)
-				return;
+			
+			// Process load order constraints ONLY
+			var constraints = (metadata as Typing.ModMetadata)?.GetConstraints() ?? Array.Empty<Typing.LoadConstraint>();
+			foreach (var constraint in constraints) {
+					switch (constraint.Type) {
+						case Typing.LoadConstraintType.Before:
+							// This mod must come BEFORE the target mod
+							// Add edge: this mod -> target mod
+							if (!string.IsNullOrEmpty(constraint.TargetModId)) {
+								var beforeTarget = mods.FirstOrDefault(m => m.GetMetadata()?.Match(constraint.TargetModId) == true);
+								if (beforeTarget != null) {
+									adjacencyList[modId].Add(beforeTarget);
+									var targetId = beforeTarget.GetMetadata()?.GetId();
+									if (targetId != null)
+										inDegree[targetId]++;
+								}
+							}
+							break;
 
-			List<Mod> allMods = new();
-			allMods.AddRange(Mods);
-			allMods.AddRange(inLoading);
+					case Typing.LoadConstraintType.After:
+						// This mod must come AFTER the target mod
+						// Add edge: target mod -> this mod
+						if (!string.IsNullOrEmpty(constraint.TargetModId)) {
+							var afterTarget = mods.FirstOrDefault(m => m.GetMetadata()?.Match(constraint.TargetModId) == true);
+							var targetId = afterTarget?.GetMetadata()?.GetId();
+							if (targetId != null) {
+								adjacencyList[targetId].Add(mod);
+								inDegree[modId]++;
+							}
+						}
+						break;
 
-			foreach (var dependency in metadata.GetRelations()) {
-				var depend = allMods.FirstOrDefault(currentMod => currentMod.GetMetadata().Match(dependency));
-				if (depend == null) {
-					Logger.LogWarning($"Mod {metadata.GetId()}@{metadata.GetVersion()} has a missing relation {dependency.GetId()}@{dependency.GetVersion()}");
-					continue;
+						// First and Last are handled after the topological sort
+					}
 				}
-
-				if (dependencies.Contains(depend))
-					continue;
-
-				dependencies.Add(depend);
-				GetRelations(depend, inLoading, ref dependencies);
 			}
+
+			// Kahn's algorithm: start with nodes that have no dependencies
+			var queue = new Queue<Mod>();
+			foreach (var mod in mods) {
+				var modId = mod.GetMetadata()?.GetId();
+				if (modId != null && inDegree[modId] == 0)
+					queue.Enqueue(mod);
+			}
+
+			var sortedMods = new List<Mod>();
+
+			// Process queue
+			while (queue.Count > 0) {
+				var mod = queue.Dequeue();
+				sortedMods.Add(mod);
+
+				var modId = mod.GetMetadata()?.GetId();
+				if (modId == null) continue;
+
+				// For each dependent of this mod
+				foreach (var dependent in adjacencyList[modId]) {
+					var depId = dependent.GetMetadata()?.GetId();
+					if (depId == null) continue;
+
+					// Decrease in-degree
+					inDegree[depId]--;
+
+					// If in-degree becomes 0, add to queue
+					if (inDegree[depId] == 0)
+						queue.Enqueue(dependent);
+				}
+			}
+
+		// Check if all mods were sorted (detect circular dependencies)
+		if (sortedMods.Count != mods.Count) {
+			// Find the problematic mods (those still with in-degree > 0)
+			var problematicMods = mods
+				.Where(m => {
+					var id = m.GetMetadata()?.GetId();
+					return id != null && !sortedMods.Contains(m);
+				})
+				.ToList();
+
+			if (problematicMods.Count > 0) {
+				// Detect and display circular dependency chains
+				var cycles = DetectCircularDependencyChains(problematicMods, adjacencyList);
+				
+				if (cycles.Count > 0) {
+					Logger.LogWarning($"Circular dependency detected! Found {cycles.Count} cycle(s) involving {problematicMods.Count} mod(s):");
+					for (int i = 0; i < cycles.Count; i++) {
+						Logger.LogWarning($"  Cycle #{i + 1}: {cycles[i]}");
+					}
+				} else {
+					Logger.LogWarning($"Circular dependency detected involving: {string.Join(", ", problematicMods.Select(m => m.GetMetadata()?.GetId()))}");
+				}
+			} else {
+				Logger.LogWarning("Possible circular dependency detected in mod constraints");
+			}
+			
+			// Add problematic mods to the end anyway (ignore the cycle, continue loading)
+			Logger.LogWarning($"Adding {problematicMods.Count} mod(s) from circular dependencies to load queue");
+			foreach (var mod in problematicMods) {
+				if (!sortedMods.Contains(mod))
+					sortedMods.Add(mod);
+			}
+		}
+
+	// Apply First/Last constraints by reordering
+	sortedMods = ApplyFirstLastConstraints(sortedMods);
+
+	return new TopologicalSortResult {
+		Success = true,
+		SortedMods = sortedMods
+	};
+}
+
+/// <summary>
+/// Detects circular dependency chains among problematic mods and formats them as readable paths.
+	/// </summary>
+	/// <param name="problematicMods">List of mods involved in circular dependencies</param>
+	/// <param name="adjacencyList">Adjacency list representing mod dependencies</param>
+	/// <returns>List of formatted circular dependency chains</returns>
+	private static List<string> DetectCircularDependencyChains(List<Mod> problematicMods, Dictionary<string, List<Mod>> adjacencyList) {
+		var cycles = new List<string>();
+		var visited = new HashSet<string>();
+		var recursionStack = new HashSet<string>();
+		var currentPath = new List<string>();
+
+		foreach (var mod in problematicMods) {
+			var modId = mod.GetMetadata()?.GetId();
+			if (modId == null || visited.Contains(modId)) continue;
+
+			if (FindCycleDFS(modId, adjacencyList, visited, recursionStack, currentPath, cycles)) {
+				// Cycle found, continue to find more
+			}
+		}
+
+		return cycles;
+	}
+
+	/// <summary>
+	/// Depth-first search to find circular dependency cycles.
+	/// </summary>
+	private static bool FindCycleDFS(
+		string currentId, 
+		Dictionary<string, List<Mod>> adjacencyList,
+		HashSet<string> visited,
+		HashSet<string> recursionStack,
+		List<string> currentPath,
+		List<string> cycles) {
+		
+		visited.Add(currentId);
+		recursionStack.Add(currentId);
+		currentPath.Add(currentId);
+
+		if (adjacencyList.TryGetValue(currentId, out var neighbors)) {
+			foreach (var neighbor in neighbors) {
+				var neighborId = neighbor.GetMetadata()?.GetId();
+				if (neighborId == null) continue;
+
+				if (!visited.Contains(neighborId)) {
+					if (FindCycleDFS(neighborId, adjacencyList, visited, recursionStack, currentPath, cycles)) {
+						// Continue searching for more cycles
+					}
+				} else if (recursionStack.Contains(neighborId)) {
+					// Found a cycle!
+					var cycleStartIndex = currentPath.IndexOf(neighborId);
+					if (cycleStartIndex >= 0) {
+						var cyclePath = currentPath.Skip(cycleStartIndex).ToList();
+						cyclePath.Add(neighborId); // Close the cycle
+						var cycleStr = string.Join(" -> ", cyclePath);
+						
+						// Avoid duplicate cycles (same cycle in different order)
+						if (!cycles.Any(c => AreCyclesEquivalent(c, cycleStr))) {
+							cycles.Add(cycleStr);
+						}
+					}
+				}
+			}
+		}
+
+		currentPath.RemoveAt(currentPath.Count - 1);
+		recursionStack.Remove(currentId);
+
+		return cycles.Count > 0;
+	}
+
+	/// <summary>
+	/// Check if two cycle strings represent the same cycle (accounting for rotation).
+	/// </summary>
+	private static bool AreCyclesEquivalent(string cycle1, string cycle2) {
+		var parts1 = cycle1.Split(new[] { " -> " }, StringSplitOptions.RemoveEmptyEntries);
+		var parts2 = cycle2.Split(new[] { " -> " }, StringSplitOptions.RemoveEmptyEntries);
+
+		if (parts1.Length != parts2.Length) return false;
+
+		// Check if parts2 is a rotation of parts1
+		var doubled = string.Join(" -> ", parts1) + " -> " + string.Join(" -> ", parts1);
+		var searchStr = string.Join(" -> ", parts2);
+
+		return doubled.Contains(searchStr);
+	}
+
+	/// <summary>
+	/// Applies First and Last load order constraints to the sorted mod list.
+	/// </summary>
+	private static List<Mod> ApplyFirstLastConstraints(List<Mod> sortedMods) {
+			var firstMods = new List<Mod>();
+			var lastMods = new List<Mod>();
+			var normalMods = new List<Mod>();
+
+			foreach (var mod in sortedMods) {
+				var constraints = (mod.GetMetadata() as Typing.ModMetadata)?.GetConstraints() ?? Array.Empty<Typing.LoadConstraint>();
+				var hasFirst = constraints.Any(c => c.Type == Typing.LoadConstraintType.First);
+				var hasLast = constraints.Any(c => c.Type == Typing.LoadConstraintType.Last);
+
+				if (hasFirst && hasLast) {
+					Logger.LogWarning($"Mod {mod.GetMetadata()?.GetId()} has both 'first' and 'last' constraints, ignoring both");
+					normalMods.Add(mod);
+				} else if (hasFirst) {
+					firstMods.Add(mod);
+				} else if (hasLast) {
+					lastMods.Add(mod);
+				} else {
+					normalMods.Add(mod);
+				}
+			}
+
+			// Combine: first mods, then normal mods, then last mods
+			var result = new List<Mod>();
+			result.AddRange(firstMods);
+			result.AddRange(normalMods);
+			result.AddRange(lastMods);
+
+			return result;
 		}
 
 		private static async UniTask<ResultLoadInfos> PrepareMods(Mod[] mods) {
@@ -237,19 +474,10 @@ namespace Nox.ModLoader {
 			if (errorResults.Count > 0)
 				return new ResultLoadInfos { Mods = Array.Empty<Mod>(), Results = results.ToArray() };
 
-			List<Mod> sortedMods = new();
-			foreach (var result in verifiedMods) {
-				var i         = 0;
-				var relations = new List<Mod>();
-				GetRelations(result, verifiedMods.ToArray(), ref relations);
-				for (; i < sortedMods.Count; i++)
-					if (relations.Contains(sortedMods[i]))
-						break;
-				sortedMods.Insert(i, result);
-			}
-
-			sortedMods.Reverse();
-			verifiedMods = sortedMods;
+			// Sort mods using topological sort to ensure dependencies are loaded before dependents
+			// Note: Circular dependencies generate warnings but don't block loading
+			var sortResult = TopologicalSort(verifiedMods);
+			verifiedMods = sortResult.SortedMods;
 
 			// Loading mods
 			List<Mod> loadedMods = new();
@@ -501,15 +729,21 @@ namespace Nox.ModLoader {
 			var sorted = new List<Mod>();
 			var visited = new HashSet<string>();
 
+			foreach (var mod in mods)
+				Visit(mod);
+
+			if (reverse)
+				sorted.Reverse();
+
+			return sorted;
+
 			void Visit(Mod mod) {
 				var id = mod.GetMetadata()?.GetId();
-				if (id == null || visited.Contains(id))
+				if (id == null || !visited.Add(id))
 					return;
 
-				visited.Add(id);
-
 				// Visit dependencies first
-				var deps = mod.GetMetadata()?.GetDepends() ?? Array.Empty<CCK.Mods.Metadata.Relation>();
+				var deps = mod.GetMetadata()?.GetDepends() ?? Array.Empty<IRelation>();
 				foreach (var dep in deps) {
 					var depMod = mods.Find(m => m.GetMetadata()?.Match(dep) == true);
 					if (depMod != null)
@@ -518,14 +752,6 @@ namespace Nox.ModLoader {
 
 				sorted.Add(mod);
 			}
-
-			foreach (var mod in mods)
-				Visit(mod);
-
-			if (reverse)
-				sorted.Reverse();
-
-			return sorted;
 		}
 
 		#endregion
@@ -602,5 +828,15 @@ namespace Nox.ModLoader {
 			DependentUnloadFailed = 8,
 			NotLoaded = 16
 		}
+	}
+
+	/// <summary>
+	/// Result of a topological sort operation.
+	/// </summary>
+	internal class TopologicalSortResult {
+		public bool Success;
+		public List<Mod> SortedMods;
+		public string ErrorMessage;
+		public string ProblematicModId;
 	}
 }

@@ -1,9 +1,10 @@
 using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
+using Nox.CCK.Mods.Metadata;
 
 namespace Nox.ModLoader.Typing
 {
-    public class Contact : CCK.Mods.Metadata.Contact
+    public class Contact : IContact
     {
         private Dictionary<string, object> _customs;
 

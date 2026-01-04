@@ -17,10 +17,16 @@ namespace Nox.ModLoader.Mods {
 	/// Each mod has its own isolated AssemblyLoadContext for proper unloading.
 	/// </summary>
 	public class FolderMod : Mod {
+		public const string MOD_FOLDER_TYPE = "folder";
+		
 		private readonly List<IModAssemblyLoader> _assemblyLoaders = new();
 		private readonly List<NativePluginLoader> _nativeLoaders   = new();
 		private readonly List<Type>               _loadedTypes     = new();
 		private          bool                     _isLoaded;
+		
+		
+		public override string GetModType()
+			=> MOD_FOLDER_TYPE;
 
 		#if !ENABLE_IL2CPP
 		/// <summary>
@@ -93,17 +99,12 @@ namespace Nox.ModLoader.Mods {
 				_context = new ModAssemblyLoadContext(Metadata.GetId(), folderPath);
 				Logger.LogDebug($"Created isolated AssemblyLoadContext for mod {Metadata.GetId()}");
 				
-				// Create permission context based on declared permissions
-				// SECURITY: FolderMods can NEVER be kernel mods - kernel is reserved for built-in KernelMods only
-				if (Metadata.IsKernel())
-				{
-					Logger.LogWarning($"[Security] Mod '{Metadata.GetId()}' declares 'kernel: true' but external mods cannot be kernel mods. Ignoring kernel flag.");
-				}
 				_permissionContext = new ModPermissionContext(
 					Metadata.GetId(),
 					Metadata.GetPermissions(),
 					isKernel: false // FolderMods are NEVER kernel mods
 				);
+				
 				Logger.LogDebug($"[Permissions] {_permissionContext.GetSummary()}");
 				#endif
 

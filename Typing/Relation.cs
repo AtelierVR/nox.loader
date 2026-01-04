@@ -5,7 +5,7 @@ using Nox.CCK.Utils;
 
 namespace Nox.ModLoader.Typing
 {
-    public class Relation : CCK.Mods.Metadata.Relation
+    public class Relation : IRelation
     {
         private string _id;
         private RelationType _relationType;

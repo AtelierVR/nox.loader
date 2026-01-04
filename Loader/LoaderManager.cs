@@ -1,3 +1,6 @@
+using System;
+using Nox.CCK.Mods.Initializers;
+using System.Linq;
 using Cysharp.Threading.Tasks;
 using Nox.CCK.Utils;
 
@@ -25,10 +28,8 @@ namespace Nox.ModLoader.Loader {
 					(float)(i + 1) / mods.Length
 				);
 
-				foreach (var entry in entries) {
-					Logger.LogDebug($"Enabling entry '{entry}' for mod '{mod.Metadata.GetId()}'", tag: nameof(LoaderManager));
+				foreach (var entry in entries)
 					mod.GetEntry(entry)?.Enable();
-				}
 			}
 
 			Logger.ClearProgress();
@@ -56,10 +57,8 @@ namespace Nox.ModLoader.Loader {
 					(float)(i + 1) / mods.Length
 				);
 
-				foreach (var entry in entries) {
-					Logger.LogDebug($"Disabling entry '{entry}' for mod '{mod.Metadata.GetId()}'", tag: nameof(LoaderManager));
+				foreach (var entry in entries)
 					mod.GetEntry(entry)?.Disable();
-				}
 			}
 
 			Logger.ClearProgress();
@@ -153,15 +152,15 @@ namespace Nox.ModLoader.Loader {
 
 			var loaded = await ModManager.LoadMods();
 
-			Logger.LogDebug($"{loaded.Mods.Length} mods loaded:", tag: nameof(LoaderManager));
+			Logger.Log($"{loaded.Mods.Length} mods loaded:", tag: nameof(LoaderManager));
 			foreach (var mod in loaded.Mods)
-				Logger.LogDebug($" - {mod.Metadata.GetId()}@{mod.Metadata.GetVersion()}", tag: nameof(LoaderManager));
+				Logger.Log($" - {mod.Metadata.GetId()}@{mod.Metadata.GetVersion()}", tag: nameof(LoaderManager));
 
 			foreach (var result in loaded.Results)
 				if (result.IsError)
-					Logger.LogError(result.Message);
+					Logger.LogError(result.Message, tag: nameof(LoaderManager));
 				else if (result.IsWarning)
-					Logger.LogWarning(result.Message);
+					Logger.LogWarning(result.Message, tag: nameof(LoaderManager));
 
 			Logger.ClearProgress();
 		}

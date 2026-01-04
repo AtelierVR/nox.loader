@@ -9,9 +9,10 @@ using Nox.CCK.Mods.Loggers;
 using Nox.CCK.Mods.Metadata;
 using Nox.CCK.Mods.Mods;
 using Nox.CCK.Mods.Panels;
+using Nox.ModLoader.Typing;
 
 namespace Nox.ModLoader {
-	public class CoreAPI : IModCoreAPI, MainModCoreAPI, ServerModCoreAPI, ClientModCoreAPI, InstanceModCoreAPI, EditorModCoreAPI {
+	public class CoreAPI : IModCoreAPI, IMainModCoreAPI, IServerModCoreAPI, IClientModCoreAPI, IEditorModCoreAPI {
 		internal readonly Mods.Mod                Mod;
 		internal readonly Cores.Panels.PanelAPI   LocalPanelAPI;
 		internal readonly Cores.Mods.ModAPI       LocalModAPI;
@@ -28,7 +29,7 @@ namespace Nox.ModLoader {
 			LocalLoggerAPI = new Cores.Loggers.LoggerAPI(mod);
 		}
 
-		public ModMetadata ModMetadata
+		public IModMetadata ModMetadata
 			=> Mod.Metadata;
 
 		public IChatAPI ChatAPI

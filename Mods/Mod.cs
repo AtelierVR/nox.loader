@@ -10,9 +10,12 @@ using Nox.ModLoader.Cores.Assets;
 using Nox.ModLoader.EntryPoints;
 
 namespace Nox.ModLoader.Mods {
+
 	public abstract class Mod : IMod {
-		internal CoreAPI            CoreAPI;
-		internal IAssetAPI          AssetAPI;
+		public const string MOD_FOLDER_TYPE = "default";
+
+		internal CoreAPI CoreAPI;
+		internal IAssetAPI AssetAPI;
 		internal Typing.ModMetadata Metadata;
 
 		public readonly Profiler Profiler;
@@ -24,15 +27,20 @@ namespace Nox.ModLoader.Mods {
 		public IEnumerable<Profile> GetProfiler()
 			=> Profiler.GetAllProfiles();
 
-		public ModMetadata GetMetadata()
+		public virtual string GetModType()
+			=> MOD_FOLDER_TYPE;
+
+
+		public IModMetadata GetMetadata()
 			=> Metadata;
 
 		internal Mod() {
-			CoreAPI  = new CoreAPI(this);
+			CoreAPI = new CoreAPI(this);
 			Profiler = new Profiler();
 		}
 
-		#region Data Storage
+
+        #region Data Storage
 
 		public T GetData<T>(string key, T defaultValue = default)
 			=> HasData<T>(key) ? (T)GetDatas()[key] : defaultValue;
@@ -48,28 +56,36 @@ namespace Nox.ModLoader.Mods {
 		public Dictionary<string, object> GetDatas()
 			=> Metadata.InternalData;
 
-		#endregion
+        #endregion
 
-		#region Entrypoints Instances
+
+        #region Entrypoints Instances
 
 		private EntryPoint[] _entryPoints = Array.Empty<EntryPoint>();
 
 		public T GetInstance<T>() {
-			T instance = default;
 
 			foreach (var entry in _entryPoints) {
-				instance = entry.GetInstance<T>();
-				if (instance != null) break;
+				var instance = entry.GetInstance<T>();
+				if (instance != null)
+					return instance;
 			}
 
-			return instance;
+			Logger.LogWarning($"Mod {Metadata.GetId()} does not have an instance of type {typeof(T).FullName}");
+			return default;
 		}
 
 		public T[] GetInstances<T>() {
 			var instances = new List<T>();
 
+			if (_entryPoints.Length == 0) 
+				return instances.ToArray();
+
 			foreach (var entry in _entryPoints)
 				instances.AddRange(entry.GetInstances<T>());
+
+			if (instances.Count == 0)
+				Logger.LogWarning($"Mod {Metadata.GetId()} does not have any instances of type {typeof(T).FullName}");
 
 			return instances.ToArray();
 		}
@@ -81,7 +97,8 @@ namespace Nox.ModLoader.Mods {
 			return null;
 		}
 
-		#endregion
+        #endregion
+
 
 		public virtual bool IsLoaded()
 			=> true;
@@ -96,17 +113,16 @@ namespace Nox.ModLoader.Mods {
 			var entryPointKeys = Metadata.GetEntryPoints().GetAll().Keys;
 			_entryPoints = new EntryPoint[entryPointKeys.Count];
 			var index = 0;
-			foreach (var entry in entryPointKeys)
-				_entryPoints[index++] = new EntryPoint(this, entry);
+			foreach (var entry in entryPointKeys) _entryPoints[index++] = new EntryPoint(this, entry);
 
-			HasUpdate      = false;
+			HasUpdate = false;
 			HasFixedUpdate = false;
-			HasLateUpdate  = false;
+			HasLateUpdate = false;
 
 			foreach (var entry in _entryPoints) {
-				if (entry.HasUpdate) HasUpdate           = true;
+				if (entry.HasUpdate) HasUpdate = true;
 				if (entry.HasFixedUpdate) HasFixedUpdate = true;
-				if (entry.HasLateUpdate) HasLateUpdate   = true;
+				if (entry.HasLateUpdate) HasLateUpdate = true;
 			}
 
 			return UniTask.FromResult(true);
@@ -116,8 +132,7 @@ namespace Nox.ModLoader.Mods {
 			Logger.LogDebug($"Unloading {Metadata.GetId()}@{Metadata.GetVersion()}");
 
 			// if not disabled, disable
-			foreach (var entry in _entryPoints)
-				entry.Disable();
+			foreach (var entry in _entryPoints) entry.Disable();
 
 			// send pre-dispose and dispose
 			await PreDispose();
@@ -125,8 +140,7 @@ namespace Nox.ModLoader.Mods {
 
 			// clear all states
 
-			foreach (var entry in _entryPoints)
-				entry.Dispose();
+			foreach (var entry in _entryPoints) entry.Dispose();
 
 			_entryPoints = Array.Empty<EntryPoint>();
 			CoreAPI.EventAPI.Emit(new ModEventContext("mod_unloaded", this));
@@ -136,8 +150,7 @@ namespace Nox.ModLoader.Mods {
 		public async UniTask Initialize() {
 			Profiler.Set("initialize", Profiler.At.Start, DateTime.UtcNow);
 			var promises = new UniTask[_entryPoints.Length];
-			for (var i = 0; i < _entryPoints.Length; i++)
-				promises[i] = _entryPoints[i].OnInitialize();
+			for (var i = 0; i < _entryPoints.Length; i++) promises[i] = _entryPoints[i].OnInitialize();
 			await UniTask.WhenAll(promises);
 			Profiler.Set("initialized", Profiler.At.Start, DateTime.UtcNow);
 		}
@@ -145,8 +158,7 @@ namespace Nox.ModLoader.Mods {
 		public async UniTask PostInitialize() {
 			Profiler.Set("post_initialize", Profiler.At.Start, DateTime.UtcNow);
 			var promises = new UniTask[_entryPoints.Length];
-			for (var i = 0; i < _entryPoints.Length; i++)
-				promises[i] = _entryPoints[i].OnPostInitialize();
+			for (var i = 0; i < _entryPoints.Length; i++) promises[i] = _entryPoints[i].OnPostInitialize();
 			await UniTask.WhenAll(promises);
 			Profiler.Set("post_initialized", Profiler.At.Start, DateTime.UtcNow);
 		}
@@ -154,8 +166,7 @@ namespace Nox.ModLoader.Mods {
 		public async UniTask PreDispose() {
 			Profiler.Set("pre_dispose", Profiler.At.Start, DateTime.UtcNow);
 			var promises = new UniTask[_entryPoints.Length];
-			for (var i = 0; i < _entryPoints.Length; i++)
-				promises[i] = _entryPoints[i].OnPreDispose();
+			for (var i = 0; i < _entryPoints.Length; i++) promises[i] = _entryPoints[i].OnPreDispose();
 			await UniTask.WhenAll(promises);
 			Profiler.Set("pre_disposed", Profiler.At.Start, DateTime.UtcNow);
 		}
@@ -163,32 +174,28 @@ namespace Nox.ModLoader.Mods {
 		public void Update() {
 			if (!HasUpdate) return;
 			Profiler.Set("update", Profiler.At.Start, DateTime.UtcNow);
-			foreach (var entry in _entryPoints)
-				entry.OnUpdate();
+			foreach (var entry in _entryPoints) entry.OnUpdate();
 			Profiler.Set("updated", Profiler.At.Start, DateTime.UtcNow);
 		}
 
 		public void FixedUpdate() {
 			if (!HasFixedUpdate) return;
 			Profiler.Set("fixed_update", Profiler.At.Start, DateTime.UtcNow);
-			foreach (var entry in _entryPoints)
-				entry.OnFixedUpdate();
+			foreach (var entry in _entryPoints) entry.OnFixedUpdate();
 			Profiler.Set("fixed_updated", Profiler.At.Start, DateTime.UtcNow);
 		}
 
 		public void LateUpdate() {
 			if (!HasLateUpdate) return;
 			Profiler.Set("late_update", Profiler.At.Start, DateTime.UtcNow);
-			foreach (var entry in _entryPoints)
-				entry.OnLateUpdate();
+			foreach (var entry in _entryPoints) entry.OnLateUpdate();
 			Profiler.Set("late_updated", Profiler.At.Start, DateTime.UtcNow);
 		}
 
 		public async UniTask Dispose() {
 			Profiler.Set("dispose", Profiler.At.Start, DateTime.UtcNow);
 			var promises = new UniTask[_entryPoints.Length];
-			for (var i = 0; i < _entryPoints.Length; i++)
-				promises[i] = _entryPoints[i].OnDispose();
+			for (var i = 0; i < _entryPoints.Length; i++) promises[i] = _entryPoints[i].OnDispose();
 			await UniTask.WhenAll(promises);
 			Profiler.Set("disposed", Profiler.At.Start, DateTime.UtcNow);
 		}
@@ -198,33 +205,33 @@ namespace Nox.ModLoader.Mods {
 	}
 
 	public enum InitializerState : byte {
-		None            = 0,
-		Initialized     = 1,
+		None = 0,
+		Initialized = 1,
 		PostInitialized = 2,
 
 		PreDisposed = 4,
-		Disposed    = 8,
+		Disposed = 8,
 
 		Ready = PostInitialized & Disposed,
-		Done  = Initialized     & Disposed
+		Done = Initialized & Disposed
 	}
 
 	public enum ExecutionEventStatus : byte {
-		None    = 0,
-		Pre     = 1,
-		Start   = 2,
+		None = 0,
+		Pre = 1,
+		Start = 2,
 		Success = 3,
-		Error   = 4,
+		Error = 4,
 	}
 
 
 	public class ModEventContext : EventContext {
 		private readonly object[] _data;
-		private readonly string   _eventName;
+		private readonly string _eventName;
 
 		public ModEventContext(string eventName, params object[] data) {
 			_eventName = eventName;
-			_data      = data;
+			_data = data;
 		}
 
 		public object[] Data
@@ -241,4 +248,5 @@ namespace Nox.ModLoader.Mods {
 
 		public Action<object[]> Callback { get; }
 	}
+
 }

@@ -1,4 +1,5 @@
 using Newtonsoft.Json.Linq;
+using Nox.CCK.Mods.Metadata;
 using Nox.CCK.Utils;
 
 namespace Nox.ModLoader.Typing
@@ -38,7 +39,7 @@ namespace Nox.ModLoader.Typing
         /// Get the engine of the reference.
         /// </summary>
         /// <returns></returns>
-        public CCK.Mods.Metadata.Engine GetEngine() => _engine;
+        public IEngine GetEngine() => _engine;
 
         /// <summary>
         /// Get the platform of the reference.

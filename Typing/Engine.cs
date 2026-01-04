@@ -1,9 +1,10 @@
 using System;
 using Newtonsoft.Json.Linq;
+using Nox.CCK.Mods.Metadata;
 using Nox.CCK.Utils;
 
 namespace Nox.ModLoader.Typing {
-	public class Engine : CCK.Mods.Metadata.Engine {
+	public class Engine : IEngine {
 		private VersionMatching  _version;
 		private CCK.Utils.Engine _engine;
 
