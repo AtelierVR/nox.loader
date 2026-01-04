@@ -6,6 +6,18 @@ using Nox.CCK.Utils;
 
 namespace Nox.ModLoader.Loader {
 	public class LoaderManager {
+		#if UNITY_EDITOR
+		public static void OnEnterPlayMode() {
+			foreach (var mod in ModManager.Mods)
+				mod.EnterPlayMode();
+		}
+
+		public static void OnExitPlayMode() {
+			foreach (var mod in ModManager.Mods)
+				mod.ExitPlayMode();
+		}
+		#endif
+
 		public static void Enable(params string[] entries) {
 			if (entries.Length == 0) {
 				Logger.LogWarning("No mod entries provided to enable.", tag: nameof(LoaderManager));

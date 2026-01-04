@@ -394,5 +394,55 @@ namespace Nox.ModLoader.EntryPoints {
 
 			profiler.Set("late_update", Name, Profiler.At.End, DateTime.UtcNow);
 		}
+
+		#if UNITY_EDITOR
+		public void OnEnterPlayMode() {
+			if (!IsEnabled() || _state != InitializerState.PostInitialized)
+				return;
+
+			var profiler = Mod.Profiler;
+			profiler.Set("enter_play_mode", Name, Profiler.At.Start, DateTime.UtcNow);
+
+			for (var i = 0; i < _instances.Length; i++) {
+				var instance = _instances[i].Reference;
+				profiler.Set("enter_play_mode", Name, i.ToString(), Profiler.At.Start, DateTime.UtcNow);
+
+				try {
+					if (instance is IMainModInitializer m)
+						m.OnEnterPlayMode();
+				} catch (Exception e) {
+					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to enter play mode for mod {Mod.Metadata.GetId()}@{Mod.Metadata.GetVersion()}", e));
+				}
+
+				profiler.Set("enter_play_mode", Name, i.ToString(), Profiler.At.End, DateTime.UtcNow);
+			}
+
+			profiler.Set("enter_play_mode", Name, Profiler.At.End, DateTime.UtcNow);
+		}
+
+		public void OnExitPlayMode() {
+			if (!IsEnabled() || _state != InitializerState.PostInitialized)
+				return;
+
+			var profiler = Mod.Profiler;
+			profiler.Set("exit_play_mode", Name, Profiler.At.Start, DateTime.UtcNow);
+
+			for (var i = 0; i < _instances.Length; i++) {
+				var instance = _instances[i].Reference;
+				profiler.Set("exit_play_mode", Name, i.ToString(), Profiler.At.Start, DateTime.UtcNow);
+
+				try {
+					if (instance is IMainModInitializer m)
+						m.OnExitPlayMode();
+				} catch (Exception e) {
+					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to exit play mode for mod {Mod.Metadata.GetId()}@{Mod.Metadata.GetVersion()}", e));
+				}
+
+				profiler.Set("exit_play_mode", Name, i.ToString(), Profiler.At.End, DateTime.UtcNow);
+			}
+
+			profiler.Set("exit_play_mode", Name, Profiler.At.End, DateTime.UtcNow);
+		}
+		#endif
 	}
 }

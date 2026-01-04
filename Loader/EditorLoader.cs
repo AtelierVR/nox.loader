@@ -53,12 +53,18 @@ namespace Nox.ModLoader.Loader {
 					// Remove editor update (runtime will handle updates)
 					EditorApplication.update -= LoaderManager.OnUpdate;
 
+					// Notify mods that play mode is entered
+					LoaderManager.OnEnterPlayMode();
+
 					// Start runtime entries
 					RuntimeLoader.Enable();
 					break;
 				case PlayModeStateChange.ExitingPlayMode:
 					// Stop runtime entries
 					RuntimeLoader.Disable();
+
+					// Notify mods that play mode is exited
+					LoaderManager.OnExitPlayMode();
 
 					// Re-add editor update
 					EditorApplication.update += LoaderManager.OnUpdate;

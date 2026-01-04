@@ -192,6 +192,20 @@ namespace Nox.ModLoader.Mods {
 			Profiler.Set("late_updated", Profiler.At.Start, DateTime.UtcNow);
 		}
 
+		#if UNITY_EDITOR
+		public void EnterPlayMode() {
+			Profiler.Set("enter_play_mode", Profiler.At.Start, DateTime.UtcNow);
+			foreach (var entry in _entryPoints) entry.OnEnterPlayMode();
+			Profiler.Set("enter_play_mode_done", Profiler.At.Start, DateTime.UtcNow);
+		}
+
+		public void ExitPlayMode() {
+			Profiler.Set("exit_play_mode", Profiler.At.Start, DateTime.UtcNow);
+			foreach (var entry in _entryPoints) entry.OnExitPlayMode();
+			Profiler.Set("exit_play_mode_done", Profiler.At.Start, DateTime.UtcNow);
+		}
+		#endif
+
 		public async UniTask Dispose() {
 			Profiler.Set("dispose", Profiler.At.Start, DateTime.UtcNow);
 			var promises = new UniTask[_entryPoints.Length];
