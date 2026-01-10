@@ -17,7 +17,7 @@ namespace Nox.ModLoader.Mods {
 	/// Each mod has its own isolated AssemblyLoadContext for proper unloading.
 	/// </summary>
 	public class FolderMod : Mod {
-		public const string MOD_FOLDER_TYPE = "folder";
+		public new const string MOD_FOLDER_TYPE = "folder";
 		
 		private readonly List<IModAssemblyLoader> _assemblyLoaders = new();
 		private readonly List<NativePluginLoader> _nativeLoaders   = new();

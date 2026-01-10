@@ -7,7 +7,7 @@ using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.ModLoader.Mods {
 	public class KernelMod : Mod {
-		public const string MOD_FOLDER_TYPE = "kernel";
+		public new const string MOD_FOLDER_TYPE = "kernel";
 
 		internal Assembly[] Assemblies;
 		internal AppDomain Domain;
