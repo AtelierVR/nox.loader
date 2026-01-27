@@ -28,7 +28,7 @@ namespace Nox.ModLoader.Cores.Events {
                         sub.Callback(data);
                     } catch (Exception e) {
                         Logger.LogError($"Error while invoking event callback: {e} of event {context.EventName}");
-                        Logger.LogException(e);
+                        Logger.LogError(e);
                     }
         }
 

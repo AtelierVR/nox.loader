@@ -129,7 +129,7 @@ namespace Nox.ModLoader.Mods {
 				_isLoaded = true;
 				return await base.Load();
 			} catch (Exception ex) {
-				Logger.LogException(new Exception($"Exception loading folder mod {Metadata.GetId()}", ex));
+				Logger.LogError(new Exception($"Exception loading folder mod {Metadata.GetId()}", ex));
 				return false;
 			}
 		}
@@ -318,7 +318,7 @@ namespace Nox.ModLoader.Mods {
 				Logger.LogDebug($"Successfully unloaded folder mod {Metadata.GetId()}");
 				return true;
 			} catch (Exception ex) {
-				Logger.LogException(new Exception($"Exception unloading folder mod {Metadata.GetId()}", ex));
+				Logger.LogError(new Exception($"Exception unloading folder mod {Metadata.GetId()}", ex));
 				return false;
 			}
 		}

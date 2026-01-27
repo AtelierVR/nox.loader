@@ -100,7 +100,7 @@ namespace Nox.ModLoader.Typing {
                 return obj;
             } catch (Exception e) {
                 CCK.Utils.Logger.LogError("Failed to load mod metadata from json");
-                CCK.Utils.Logger.LogException(e);
+                CCK.Utils.Logger.LogError(e);
             }
 
             return null;
@@ -453,7 +453,7 @@ namespace Nox.ModLoader.Typing {
                 return true;
             } catch (Exception e) {
                 CCK.Utils.Logger.LogError("Failed to save mod metadata to json");
-                CCK.Utils.Logger.LogException(e);
+                CCK.Utils.Logger.LogError(e);
             }
 
             return false;

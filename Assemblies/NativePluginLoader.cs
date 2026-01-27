@@ -159,7 +159,7 @@ namespace Nox.ModLoader.Assemblies {
 				return true;
 			} catch (Exception ex) {
 				Logger.LogError($"Exception loading native library '{_libraryPath}': {ex.Message}");
-				Logger.LogException(ex);
+				Logger.LogError(ex);
 				return false;
 			}
 		}

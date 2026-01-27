@@ -600,7 +600,7 @@ namespace Nox.ModLoader {
 			}
 			catch (Exception ex) {
 				Logger.LogError($"Exception unloading mod '{modId}': {ex.Message}");
-				Logger.LogException(ex);
+				Logger.LogError(ex);
 				
 				results.Add(new ResultUnload {
 					Type = ResultUnload.ResultType.UnloadError,

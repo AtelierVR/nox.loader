@@ -279,7 +279,7 @@ namespace Nox.ModLoader.Assemblies {
 				return assembly;
 			} catch (Exception ex) {
 				Logger.LogError($"[ModContext:{_modId}] Failed to load assembly '{assemblyPath}': {ex.Message}");
-				Logger.LogException(ex);
+				Logger.LogError(ex);
 				return null;
 			}
 		}

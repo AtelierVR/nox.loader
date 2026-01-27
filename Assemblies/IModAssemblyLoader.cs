@@ -138,7 +138,7 @@ namespace Nox.ModLoader.Assemblies {
 				return true;
 			} catch (Exception ex) {
 				Logger.LogError($"Failed to load Mono assembly '{assemblyPath}': {ex.Message}");
-				Logger.LogException(ex);
+				Logger.LogError(ex);
 				return false;
 			}
 		}
