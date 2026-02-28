@@ -8,12 +8,14 @@ namespace Nox.ModLoader.Loader {
 	public class LoaderManager {
 		#if UNITY_EDITOR
 		public static void OnEnterPlayMode() {
-			foreach (var mod in ModManager.Mods)
+			var mods = ModManager.GetMods();
+			foreach (var mod in mods)
 				mod.EnterPlayMode();
 		}
 
 		public static void OnExitPlayMode() {
-			foreach (var mod in ModManager.Mods)
+			var mods = ModManager.GetMods();
+			foreach (var mod in mods)
 				mod.ExitPlayMode();
 		}
 		#endif
@@ -77,17 +79,20 @@ namespace Nox.ModLoader.Loader {
 		}
 
 		public static void OnUpdate() {
-			foreach (var mod in ModManager.Mods)
+			var mods = ModManager.GetMods();
+			foreach (var mod in mods)
 				mod.Update();
 		}
 
 		public static void OnFixedUpdate() {
-			foreach (var mod in ModManager.Mods)
+			var mods = ModManager.GetMods();
+			foreach (var mod in mods)
 				mod.FixedUpdate();
 		}
 
 		public static void OnLateUpdate() {
-			foreach (var mod in ModManager.Mods)
+			var mods = ModManager.GetMods();
+			foreach (var mod in mods)
 				mod.LateUpdate();
 		}
 

@@ -12,35 +12,36 @@ namespace Nox.ModLoader {
 	public static class ModManager {
 		public static List<Mod> Mods { get; private set; } = new();
 		private static bool _initialized;
-		
+
 		/// <summary>
 		/// Event fired when a mod is loaded.
 		/// </summary>
 		public static event Action<Mod> OnModLoaded;
-		
+
 		/// <summary>
 		/// Event fired when a mod is unloaded.
 		/// </summary>
 		public static event Action<Mod> OnModUnloaded;
-		
+
 		/// <summary>
 		/// Initialize the mod manager and permission system.
 		/// </summary>
 		private static void EnsureInitialized() {
-			if (_initialized) return;
+			if (_initialized)
+				return;
 			_initialized = true;
-			
+
 			// Initialize permission registry
 			PermissionRegistry.Initialize();
 			Logger.LogDebug("[ModManager] Permission registry initialized");
 		}
 
 		public static Mod[] GetMods()
-			=> Mods.ToArray();
+			=> Mods?.ToArray() ?? Array.Empty<Mod>();
 
 		public static Mod GetMod(string id)
-			=> Mods.Find(x => x.GetMetadata().Match(id));
-		
+			=> Mods?.Find(x => x.GetMetadata().Match(id));
+
 		/// <summary>
 		/// Checks if a mod is currently loaded.
 		/// </summary>
@@ -55,23 +56,25 @@ namespace Nox.ModLoader {
 
 		public static async UniTask<ResultLoadInfos> LoadMods(IDiscover discover) {
 			EnsureInitialized();
-			
+
 			var mods     = new List<Mod>();
 			var packages = discover.FindAllPackages();
 
-			foreach (var package in packages)
+			foreach (var package in packages) {
 				mods.Add(package.InternalDDiscover.CreateMod(package));
-
+				Logger.LogDebug($"{package.GetId()}@{package.GetVersion()} found by discover {discover.GetType().Name}", tag: nameof(ModManager));
+			}
+			
 			return await PrepareMods(mods.ToArray());
 		}
 
 		public static async UniTask<ResultLoadInfos> LoadMods(string[] ids, IDiscover discover)
 			=> await PrepareMods(
 				(from id in ids
-				select discover.FindPackage(id)
-				into package
-				where package != null
-				select package.InternalDDiscover.CreateMod(package))
+					select discover.FindPackage(id)
+					into package
+					where package != null
+					select package.InternalDDiscover.CreateMod(package))
 				.ToArray()
 			);
 
@@ -123,15 +126,15 @@ namespace Nox.ModLoader {
 			allMods.AddRange(mods);
 
 			return (from dependency in metadata.GetBreaks()
-				from currentMod in allMods
-				where currentMod.GetMetadata().Match(dependency)
-				select new ResultLoad {
-					Type = ResultLoad.ResultType.MissingDependency,
-					Message =
-						$"Mod {metadata.GetId()}@{metadata.GetVersion()} breaks {dependency.GetId()}@{dependency.GetVersion()}",
-					CausedBy = metadata.GetId(),
-					ForMod   = dependency.GetId()
-				})
+					from currentMod in allMods
+					where currentMod.GetMetadata().Match(dependency)
+					select new ResultLoad {
+						Type = ResultLoad.ResultType.MissingDependency,
+						Message =
+							$"Mod {metadata.GetId()}@{metadata.GetVersion()} breaks {dependency.GetId()}@{dependency.GetVersion()}",
+						CausedBy = metadata.GetId(),
+						ForMod   = dependency.GetId()
+					})
 				.ToArray();
 		}
 
@@ -151,15 +154,15 @@ namespace Nox.ModLoader {
 			allMods.AddRange(mods);
 
 			return (from dependency in metadata.GetConflicts()
-				from currentMod in allMods
-				where currentMod.GetMetadata().Match(dependency)
-				select new ResultLoad {
-					Type = ResultLoad.ResultType.MissingDependency,
-					Message =
-						$"Mod {metadata.GetId()}@{metadata.GetVersion()} conflicts with {dependency.GetId()}@{dependency.GetVersion()}",
-					CausedBy = metadata.GetId(),
-					ForMod   = dependency.GetId()
-				})
+					from currentMod in allMods
+					where currentMod.GetMetadata().Match(dependency)
+					select new ResultLoad {
+						Type = ResultLoad.ResultType.MissingDependency,
+						Message =
+							$"Mod {metadata.GetId()}@{metadata.GetVersion()} conflicts with {dependency.GetId()}@{dependency.GetVersion()}",
+						CausedBy = metadata.GetId(),
+						ForMod   = dependency.GetId()
+					})
 				.ToArray();
 		}
 
@@ -189,29 +192,31 @@ namespace Nox.ModLoader {
 		/// <param name="mods">List of mods to sort</param>
 		/// <returns>Result containing sorted mods or error information</returns>
 		private static TopologicalSortResult TopologicalSort(List<Mod> mods) {
-		// Build adjacency list and in-degree map
-		var adjacencyList = new Dictionary<string, List<Mod>>();
-		var inDegree = new Dictionary<string, int>();
+			// Build adjacency list and in-degree map
+			var adjacencyList = new Dictionary<string, List<Mod>>();
+			var inDegree      = new Dictionary<string, int>();
 
-		// Initialize
-		foreach (var mod in mods) {
-			var modId = mod.GetMetadata()?.GetId();
-			if (modId == null) continue;
+			// Initialize
+			foreach (var mod in mods) {
+				var modId = mod.GetMetadata()?.GetId();
+				if (modId == null)
+					continue;
 
-			adjacencyList[modId] = new List<Mod>();
-			inDegree[modId] = 0;
-		}
+				adjacencyList[modId] = new List<Mod>();
+				inDegree[modId]      = 0;
+			}
 
-		// Build the graph: only use constraints (not dependencies) for ordering
-		foreach (var mod in mods) {
-			var modId = mod.GetMetadata()?.GetId();
-			if (modId == null) continue;
+			// Build the graph: only use constraints (not dependencies) for ordering
+			foreach (var mod in mods) {
+				var modId = mod.GetMetadata()?.GetId();
+				if (modId == null)
+					continue;
 
-			var metadata = mod.GetMetadata();
-			
-			// Process load order constraints ONLY
-			var constraints = (metadata as Typing.ModMetadata)?.GetConstraints() ?? Array.Empty<Typing.LoadConstraint>();
-			foreach (var constraint in constraints) {
+				var metadata = mod.GetMetadata();
+
+				// Process load order constraints ONLY
+				var constraints = (metadata as Typing.ModMetadata)?.GetConstraints() ?? Array.Empty<Typing.LoadConstraint>();
+				foreach (var constraint in constraints) {
 					switch (constraint.Type) {
 						case Typing.LoadConstraintType.Before:
 							// This mod must come BEFORE the target mod
@@ -227,18 +232,18 @@ namespace Nox.ModLoader {
 							}
 							break;
 
-					case Typing.LoadConstraintType.After:
-						// This mod must come AFTER the target mod
-						// Add edge: target mod -> this mod
-						if (!string.IsNullOrEmpty(constraint.TargetModId)) {
-							var afterTarget = mods.FirstOrDefault(m => m.GetMetadata()?.Match(constraint.TargetModId) == true);
-							var targetId = afterTarget?.GetMetadata()?.GetId();
-							if (targetId != null) {
-								adjacencyList[targetId].Add(mod);
-								inDegree[modId]++;
+						case Typing.LoadConstraintType.After:
+							// This mod must come AFTER the target mod
+							// Add edge: target mod -> this mod
+							if (!string.IsNullOrEmpty(constraint.TargetModId)) {
+								var afterTarget = mods.FirstOrDefault(m => m.GetMetadata()?.Match(constraint.TargetModId) == true);
+								var targetId    = afterTarget?.GetMetadata()?.GetId();
+								if (targetId != null) {
+									adjacencyList[targetId].Add(mod);
+									inDegree[modId]++;
+								}
 							}
-						}
-						break;
+							break;
 
 						// First and Last are handled after the topological sort
 					}
@@ -261,12 +266,14 @@ namespace Nox.ModLoader {
 				sortedMods.Add(mod);
 
 				var modId = mod.GetMetadata()?.GetId();
-				if (modId == null) continue;
+				if (modId == null)
+					continue;
 
 				// For each dependent of this mod
 				foreach (var dependent in adjacencyList[modId]) {
 					var depId = dependent.GetMetadata()?.GetId();
-					if (depId == null) continue;
+					if (depId == null)
+						continue;
 
 					// Decrease in-degree
 					inDegree[depId]--;
@@ -277,148 +284,152 @@ namespace Nox.ModLoader {
 				}
 			}
 
-		// Check if all mods were sorted (detect circular dependencies)
-		if (sortedMods.Count != mods.Count) {
-			// Find the problematic mods (those still with in-degree > 0)
-			var problematicMods = mods
-				.Where(m => {
-					var id = m.GetMetadata()?.GetId();
-					return id != null && !sortedMods.Contains(m);
-				})
-				.ToList();
+			// Check if all mods were sorted (detect circular dependencies)
+			if (sortedMods.Count != mods.Count) {
+				// Find the problematic mods (those still with in-degree > 0)
+				var problematicMods = mods
+					.Where(m => {
+						var id = m.GetMetadata()?.GetId();
+						return id != null && !sortedMods.Contains(m);
+					})
+					.ToList();
 
-			if (problematicMods.Count > 0) {
-				// Detect and display circular dependency chains
-				var cycles = DetectCircularDependencyChains(problematicMods, adjacencyList);
-				
-				if (cycles.Count > 0) {
-					Logger.LogWarning($"Circular dependency detected! Found {cycles.Count} cycle(s) involving {problematicMods.Count} mod(s):");
-					for (int i = 0; i < cycles.Count; i++) {
-						Logger.LogWarning($"  Cycle #{i + 1}: {cycles[i]}");
+				if (problematicMods.Count > 0) {
+					// Detect and display circular dependency chains
+					var cycles = DetectCircularDependencyChains(problematicMods, adjacencyList);
+
+					if (cycles.Count > 0) {
+						Logger.LogWarning($"Circular dependency detected! Found {cycles.Count} cycle(s) involving {problematicMods.Count} mod(s):");
+						for (int i = 0; i < cycles.Count; i++) {
+							Logger.LogWarning($"  Cycle #{i + 1}: {cycles[i]}");
+						}
+					} else {
+						Logger.LogWarning($"Circular dependency detected involving: {string.Join(", ", problematicMods.Select(m => m.GetMetadata()?.GetId()))}");
 					}
 				} else {
-					Logger.LogWarning($"Circular dependency detected involving: {string.Join(", ", problematicMods.Select(m => m.GetMetadata()?.GetId()))}");
+					Logger.LogWarning("Possible circular dependency detected in mod constraints");
 				}
-			} else {
-				Logger.LogWarning("Possible circular dependency detected in mod constraints");
+
+				// Add problematic mods to the end anyway (ignore the cycle, continue loading)
+				Logger.LogWarning($"Adding {problematicMods.Count} mod(s) from circular dependencies to load queue");
+				foreach (var mod in problematicMods) {
+					if (!sortedMods.Contains(mod))
+						sortedMods.Add(mod);
+				}
 			}
-			
-			// Add problematic mods to the end anyway (ignore the cycle, continue loading)
-			Logger.LogWarning($"Adding {problematicMods.Count} mod(s) from circular dependencies to load queue");
+
+			// Apply First/Last constraints by reordering
+			sortedMods = ApplyFirstLastConstraints(sortedMods);
+
+			return new TopologicalSortResult {
+				Success    = true,
+				SortedMods = sortedMods
+			};
+		}
+
+		/// <summary>
+		/// Detects circular dependency chains among problematic mods and formats them as readable paths.
+		/// </summary>
+		/// <param name="problematicMods">List of mods involved in circular dependencies</param>
+		/// <param name="adjacencyList">Adjacency list representing mod dependencies</param>
+		/// <returns>List of formatted circular dependency chains</returns>
+		private static List<string> DetectCircularDependencyChains(List<Mod> problematicMods, Dictionary<string, List<Mod>> adjacencyList) {
+			var cycles         = new List<string>();
+			var visited        = new HashSet<string>();
+			var recursionStack = new HashSet<string>();
+			var currentPath    = new List<string>();
+
 			foreach (var mod in problematicMods) {
-				if (!sortedMods.Contains(mod))
-					sortedMods.Add(mod);
+				var modId = mod.GetMetadata()?.GetId();
+				if (modId == null || visited.Contains(modId))
+					continue;
+
+				if (FindCycleDFS(modId, adjacencyList, visited, recursionStack, currentPath, cycles)) {
+					// Cycle found, continue to find more
+				}
 			}
+
+			return cycles;
 		}
 
-	// Apply First/Last constraints by reordering
-	sortedMods = ApplyFirstLastConstraints(sortedMods);
+		/// <summary>
+		/// Depth-first search to find circular dependency cycles.
+		/// </summary>
+		private static bool FindCycleDFS(
+			string                        currentId,
+			Dictionary<string, List<Mod>> adjacencyList,
+			HashSet<string>               visited,
+			HashSet<string>               recursionStack,
+			List<string>                  currentPath,
+			List<string>                  cycles
+		) {
 
-	return new TopologicalSortResult {
-		Success = true,
-		SortedMods = sortedMods
-	};
-}
+			visited.Add(currentId);
+			recursionStack.Add(currentId);
+			currentPath.Add(currentId);
 
-/// <summary>
-/// Detects circular dependency chains among problematic mods and formats them as readable paths.
-	/// </summary>
-	/// <param name="problematicMods">List of mods involved in circular dependencies</param>
-	/// <param name="adjacencyList">Adjacency list representing mod dependencies</param>
-	/// <returns>List of formatted circular dependency chains</returns>
-	private static List<string> DetectCircularDependencyChains(List<Mod> problematicMods, Dictionary<string, List<Mod>> adjacencyList) {
-		var cycles = new List<string>();
-		var visited = new HashSet<string>();
-		var recursionStack = new HashSet<string>();
-		var currentPath = new List<string>();
+			if (adjacencyList.TryGetValue(currentId, out var neighbors)) {
+				foreach (var neighbor in neighbors) {
+					var neighborId = neighbor.GetMetadata()?.GetId();
+					if (neighborId == null)
+						continue;
 
-		foreach (var mod in problematicMods) {
-			var modId = mod.GetMetadata()?.GetId();
-			if (modId == null || visited.Contains(modId)) continue;
+					if (!visited.Contains(neighborId)) {
+						if (FindCycleDFS(neighborId, adjacencyList, visited, recursionStack, currentPath, cycles)) {
+							// Continue searching for more cycles
+						}
+					} else if (recursionStack.Contains(neighborId)) {
+						// Found a cycle!
+						var cycleStartIndex = currentPath.IndexOf(neighborId);
+						if (cycleStartIndex >= 0) {
+							var cyclePath = currentPath.Skip(cycleStartIndex).ToList();
+							cyclePath.Add(neighborId); // Close the cycle
+							var cycleStr = string.Join(" -> ", cyclePath);
 
-			if (FindCycleDFS(modId, adjacencyList, visited, recursionStack, currentPath, cycles)) {
-				// Cycle found, continue to find more
-			}
-		}
-
-		return cycles;
-	}
-
-	/// <summary>
-	/// Depth-first search to find circular dependency cycles.
-	/// </summary>
-	private static bool FindCycleDFS(
-		string currentId, 
-		Dictionary<string, List<Mod>> adjacencyList,
-		HashSet<string> visited,
-		HashSet<string> recursionStack,
-		List<string> currentPath,
-		List<string> cycles) {
-		
-		visited.Add(currentId);
-		recursionStack.Add(currentId);
-		currentPath.Add(currentId);
-
-		if (adjacencyList.TryGetValue(currentId, out var neighbors)) {
-			foreach (var neighbor in neighbors) {
-				var neighborId = neighbor.GetMetadata()?.GetId();
-				if (neighborId == null) continue;
-
-				if (!visited.Contains(neighborId)) {
-					if (FindCycleDFS(neighborId, adjacencyList, visited, recursionStack, currentPath, cycles)) {
-						// Continue searching for more cycles
-					}
-				} else if (recursionStack.Contains(neighborId)) {
-					// Found a cycle!
-					var cycleStartIndex = currentPath.IndexOf(neighborId);
-					if (cycleStartIndex >= 0) {
-						var cyclePath = currentPath.Skip(cycleStartIndex).ToList();
-						cyclePath.Add(neighborId); // Close the cycle
-						var cycleStr = string.Join(" -> ", cyclePath);
-						
-						// Avoid duplicate cycles (same cycle in different order)
-						if (!cycles.Any(c => AreCyclesEquivalent(c, cycleStr))) {
-							cycles.Add(cycleStr);
+							// Avoid duplicate cycles (same cycle in different order)
+							if (!cycles.Any(c => AreCyclesEquivalent(c, cycleStr))) {
+								cycles.Add(cycleStr);
+							}
 						}
 					}
 				}
 			}
+
+			currentPath.RemoveAt(currentPath.Count - 1);
+			recursionStack.Remove(currentId);
+
+			return cycles.Count > 0;
 		}
 
-		currentPath.RemoveAt(currentPath.Count - 1);
-		recursionStack.Remove(currentId);
+		/// <summary>
+		/// Check if two cycle strings represent the same cycle (accounting for rotation).
+		/// </summary>
+		private static bool AreCyclesEquivalent(string cycle1, string cycle2) {
+			var parts1 = cycle1.Split(new[] { " -> " }, StringSplitOptions.RemoveEmptyEntries);
+			var parts2 = cycle2.Split(new[] { " -> " }, StringSplitOptions.RemoveEmptyEntries);
 
-		return cycles.Count > 0;
-	}
+			if (parts1.Length != parts2.Length)
+				return false;
 
-	/// <summary>
-	/// Check if two cycle strings represent the same cycle (accounting for rotation).
-	/// </summary>
-	private static bool AreCyclesEquivalent(string cycle1, string cycle2) {
-		var parts1 = cycle1.Split(new[] { " -> " }, StringSplitOptions.RemoveEmptyEntries);
-		var parts2 = cycle2.Split(new[] { " -> " }, StringSplitOptions.RemoveEmptyEntries);
+			// Check if parts2 is a rotation of parts1
+			var doubled   = string.Join(" -> ", parts1) + " -> " + string.Join(" -> ", parts1);
+			var searchStr = string.Join(" -> ", parts2);
 
-		if (parts1.Length != parts2.Length) return false;
+			return doubled.Contains(searchStr);
+		}
 
-		// Check if parts2 is a rotation of parts1
-		var doubled = string.Join(" -> ", parts1) + " -> " + string.Join(" -> ", parts1);
-		var searchStr = string.Join(" -> ", parts2);
-
-		return doubled.Contains(searchStr);
-	}
-
-	/// <summary>
-	/// Applies First and Last load order constraints to the sorted mod list.
-	/// </summary>
-	private static List<Mod> ApplyFirstLastConstraints(List<Mod> sortedMods) {
-			var firstMods = new List<Mod>();
-			var lastMods = new List<Mod>();
+		/// <summary>
+		/// Applies First and Last load order constraints to the sorted mod list.
+		/// </summary>
+		private static List<Mod> ApplyFirstLastConstraints(List<Mod> sortedMods) {
+			var firstMods  = new List<Mod>();
+			var lastMods   = new List<Mod>();
 			var normalMods = new List<Mod>();
 
 			foreach (var mod in sortedMods) {
 				var constraints = (mod.GetMetadata() as Typing.ModMetadata)?.GetConstraints() ?? Array.Empty<Typing.LoadConstraint>();
-				var hasFirst = constraints.Any(c => c.Type == Typing.LoadConstraintType.First);
-				var hasLast = constraints.Any(c => c.Type == Typing.LoadConstraintType.Last);
+				var hasFirst    = constraints.Any(c => c.Type == Typing.LoadConstraintType.First);
+				var hasLast     = constraints.Any(c => c.Type == Typing.LoadConstraintType.Last);
 
 				if (hasFirst && hasLast) {
 					Logger.LogWarning($"Mod {mod.GetMetadata()?.GetId()} has both 'first' and 'last' constraints, ignoring both");
@@ -472,7 +483,10 @@ namespace Nox.ModLoader {
 
 			var errorResults = results.FindAll(x => x.IsError);
 			if (errorResults.Count > 0)
-				return new ResultLoadInfos { Mods = Array.Empty<Mod>(), Results = results.ToArray() };
+				return new ResultLoadInfos {
+					Mods    = Array.Empty<Mod>(),
+					Results = results.ToArray()
+				};
 
 			// Sort mods using topological sort to ensure dependencies are loaded before dependents
 			// Note: Circular dependencies generate warnings but don't block loading
@@ -496,15 +510,19 @@ namespace Nox.ModLoader {
 							ForMod  = mod.GetMetadata().GetId()
 						}
 					);
-				else loadedMods.Add(mod);
+				else
+					loadedMods.Add(mod);
 			}
 
 			errorResults = results.FindAll(x => x.IsError);
 			if (errorResults.Count > 0)
-				return new ResultLoadInfos { Mods = Array.Empty<Mod>(), Results = results.ToArray() };
+				return new ResultLoadInfos {
+					Mods    = Array.Empty<Mod>(),
+					Results = results.ToArray()
+				};
 
 			Mods.AddRange(loadedMods);
-			
+
 			// Fire events for loaded mods
 			foreach (var mod in loadedMods)
 				OnModLoaded?.Invoke(mod);
@@ -520,7 +538,10 @@ namespace Nox.ModLoader {
 			);
 
 
-			return new ResultLoadInfos { Mods = loadedMods.ToArray(), Results = results.ToArray() };
+			return new ResultLoadInfos {
+				Mods    = loadedMods.ToArray(),
+				Results = results.ToArray()
+			};
 		}
 
 		#region Unload Methods
@@ -537,9 +558,9 @@ namespace Nox.ModLoader {
 					Success = false,
 					Results = new[] {
 						new ResultUnload {
-							Type = ResultUnload.ResultType.NotFound,
+							Type    = ResultUnload.ResultType.NotFound,
 							Message = $"Mod '{modId}' not found",
-							ForMod = modId
+							ForMod  = modId
 						}
 					}
 				};
@@ -554,7 +575,7 @@ namespace Nox.ModLoader {
 		/// <returns>Result of the unload operation</returns>
 		public static async UniTask<ResultUnloadInfos> UnloadMod(Mod mod) {
 			var results = new List<ResultUnload>();
-			var modId = mod.GetMetadata()?.GetId() ?? "<unknown>";
+			var modId   = mod.GetMetadata()?.GetId() ?? "<unknown>";
 
 			// Check for dependents - mods that depend on this mod
 			var dependents = GetModsDependingOn(mod);
@@ -563,12 +584,12 @@ namespace Nox.ModLoader {
 				foreach (var dependent in dependents.Reverse()) {
 					var depResult = await UnloadMod(dependent);
 					results.AddRange(depResult.Results);
-					
+
 					if (!depResult.Success) {
 						results.Add(new ResultUnload {
-							Type = ResultUnload.ResultType.DependentUnloadFailed,
+							Type    = ResultUnload.ResultType.DependentUnloadFailed,
 							Message = $"Failed to unload dependent mod '{dependent.GetMetadata().GetId()}'",
-							ForMod = modId
+							ForMod  = modId
 						});
 						return new ResultUnloadInfos { Success = false, Results = results.ToArray() };
 					}
@@ -580,9 +601,9 @@ namespace Nox.ModLoader {
 
 				if (!await mod.Unload()) {
 					results.Add(new ResultUnload {
-						Type = ResultUnload.ResultType.UnloadError,
+						Type    = ResultUnload.ResultType.UnloadError,
 						Message = $"Failed to unload mod '{modId}'",
-						ForMod = modId
+						ForMod  = modId
 					});
 					return new ResultUnloadInfos { Success = false, Results = results.ToArray() };
 				}
@@ -591,21 +612,20 @@ namespace Nox.ModLoader {
 				OnModUnloaded?.Invoke(mod);
 
 				results.Add(new ResultUnload {
-					Type = ResultUnload.ResultType.Success,
+					Type    = ResultUnload.ResultType.Success,
 					Message = $"Successfully unloaded mod '{modId}'",
-					ForMod = modId
+					ForMod  = modId
 				});
 
 				return new ResultUnloadInfos { Success = true, Results = results.ToArray() };
-			}
-			catch (Exception ex) {
+			} catch (Exception ex) {
 				Logger.LogError($"Exception unloading mod '{modId}': {ex.Message}");
 				Logger.LogError(ex);
-				
+
 				results.Add(new ResultUnload {
-					Type = ResultUnload.ResultType.UnloadError,
+					Type    = ResultUnload.ResultType.UnloadError,
 					Message = $"Exception unloading mod '{modId}': {ex.Message}",
-					ForMod = modId
+					ForMod  = modId
 				});
 				return new ResultUnloadInfos { Success = false, Results = results.ToArray() };
 			}
@@ -726,7 +746,7 @@ namespace Nox.ModLoader {
 		/// <param name="mods">List of mods to sort</param>
 		/// <param name="reverse">If true, dependents come first (for unloading)</param>
 		private static List<Mod> SortByDependencies(List<Mod> mods, bool reverse = false) {
-			var sorted = new List<Mod>();
+			var sorted  = new List<Mod>();
 			var visited = new HashSet<string>();
 
 			foreach (var mod in mods)
@@ -758,19 +778,19 @@ namespace Nox.ModLoader {
 	}
 
 	public class ResultLoadInfos {
-		public Mod[]        Mods;
-		public ResultLoad[] Results;
+		public Mod[] Mods { get; set; }
+		public ResultLoad[] Results { get; set; }
 
 		public ResultLoad[] GetResults(ResultLoad.ResultType flags)
 			=> Array.FindAll(Results, x => x.Type.HasFlag(flags));
 	}
 
 	public class ResultLoad {
-		public ResultType Type;
-		public string     Message;
+		public ResultType Type { get; set; }
+		public string Message { get; set; }
 
-		public string CausedBy;
-		public string ForMod;
+		public string CausedBy { get; set; }
+		public string ForMod { get; set; }
 
 		public bool IsSuccess
 			=> Type.HasFlag(ResultType.IsSuccess);
@@ -784,17 +804,17 @@ namespace Nox.ModLoader {
 
 		[Flags]
 		public enum ResultType {
-			Success           = 1,
+			Success = 1,
 			MissingDependency = 2,
-			IsConflict        = 4,
-			IsBreak           = 8,
-			NoMetadata        = 16,
-			AlreadyLoaded     = 32,
-			LoadError         = 64,
+			IsConflict = 4,
+			IsBreak = 8,
+			NoMetadata = 16,
+			AlreadyLoaded = 32,
+			LoadError = 64,
 
 			IsSuccess = Success,
 			IsWarning = IsConflict,
-			IsError   = MissingDependency | IsBreak | NoMetadata | AlreadyLoaded | LoadError
+			IsError = MissingDependency | IsBreak | NoMetadata | AlreadyLoaded | LoadError
 		}
 	}
 
@@ -802,8 +822,8 @@ namespace Nox.ModLoader {
 	/// Results from unload operations.
 	/// </summary>
 	public class ResultUnloadInfos {
-		public bool Success;
-		public ResultUnload[] Results;
+		public bool Success { get; set; }
+		public ResultUnload[] Results { get; set; }
 
 		public ResultUnload[] GetResults(ResultUnload.ResultType flags)
 			=> Array.FindAll(Results, x => x.Type.HasFlag(flags));
@@ -813,12 +833,14 @@ namespace Nox.ModLoader {
 	/// Result of a single mod unload operation.
 	/// </summary>
 	public class ResultUnload {
-		public ResultType Type;
-		public string Message;
-		public string ForMod;
+		public ResultType Type { get; set; }
+		public string Message { get; set; }
+		public string ForMod { get; set; }
 
-		public bool IsSuccess => Type == ResultType.Success;
-		public bool IsError => Type != ResultType.Success;
+		public bool IsSuccess
+			=> Type == ResultType.Success;
+		public bool IsError
+			=> Type != ResultType.Success;
 
 		[Flags]
 		public enum ResultType {
@@ -834,9 +856,9 @@ namespace Nox.ModLoader {
 	/// Result of a topological sort operation.
 	/// </summary>
 	internal class TopologicalSortResult {
-		public bool Success;
-		public List<Mod> SortedMods;
-		public string ErrorMessage;
-		public string ProblematicModId;
+		public bool Success { get; set; }
+		public List<Mod> SortedMods { get; set; }
+		public string ErrorMessage { get; set; }
+		public string ProblematicModId { get; set; }
 	}
 }

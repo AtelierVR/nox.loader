@@ -84,9 +84,6 @@ namespace Nox.ModLoader.Mods {
 			foreach (var entry in _entryPoints)
 				instances.AddRange(entry.GetInstances<T>());
 
-			if (instances.Count == 0)
-				Logger.LogWarning($"Mod {Metadata.GetId()} does not have any instances of type {typeof(T).FullName}");
-
 			return instances.ToArray();
 		}
 

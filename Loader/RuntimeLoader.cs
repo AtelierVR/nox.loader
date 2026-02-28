@@ -7,7 +7,7 @@ using Logger = Nox.CCK.Utils.Logger;
 namespace Nox.ModLoader.Loader {
 	public class RuntimeLoader : MonoBehaviour {
 		private static RuntimeLoader _instance;
-		private        bool          _initialized;
+		private bool _initialized;
 
 		#if !UNITY_EDITOR
 		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -16,15 +16,15 @@ namespace Nox.ModLoader.Loader {
 
 		public static void Enable() {
 			if (IsLoaded()) {
-				Logger.LogWarning($"{nameof(RuntimeLoader)} is already loaded.", _instance);
+				Logger.LogWarning($"Cannot enable because it is already loaded.", _instance, nameof(RuntimeLoader));
 				return;
 			}
 
-			var go = new GameObject($"[{nameof(RuntimeLoader)}]");
+			var go     = new GameObject($"[{nameof(RuntimeLoader)}]");
 			var loader = go.AddComponent<RuntimeLoader>();
 			DontDestroyOnLoad(go);
 			_instance = loader;
-			Logger.Log($"{nameof(RuntimeLoader)} initialized.", loader);
+			Logger.Log("Initializing", loader, nameof(RuntimeLoader));
 		}
 
 		public static bool IsLoaded()
@@ -35,7 +35,7 @@ namespace Nox.ModLoader.Loader {
 
 		public static void Disable() {
 			if (!IsLoaded()) {
-				Logger.LogWarning($"{nameof(RuntimeLoader)} is not loaded.");
+				Logger.LogWarning($"Cannot disable because it is not loaded.", null, nameof(RuntimeLoader));
 				return;
 			}
 
@@ -43,42 +43,69 @@ namespace Nox.ModLoader.Loader {
 		}
 
 		private void Awake() {
-			if (!_instance || _instance == this) return;
-			Logger.LogWarning($"An instance of {nameof(RuntimeLoader)} already exists. Destroying duplicate.", this);
+			if (!_instance || _instance == this)
+				return;
+			Logger.LogWarning("A duplicate instance was created. This should not happen. Destroying duplicate.", this, nameof(RuntimeLoader));
 			Destroy(gameObject);
-			return;
 		}
 
 		private void Start()
 			=> StartAsync().Forget();
 
 		private async UniTask StartAsync() {
-			Logger.Log($"{nameof(RuntimeLoader)} starting.", this);
-			#if UNITY_EDITOR
-			LoaderManager.Enable(Application.isBatchMode ? EntryPoint.ServerEntry : EntryPoint.ClientEntry);
-			#else
+			Logger.Log("Starting up", this, nameof(RuntimeLoader));
+			try {
+				#if UNITY_EDITOR
+				LoaderManager.Enable(Application.isBatchMode ? EntryPoint.ServerEntry : EntryPoint.ClientEntry);
+				#else
 			await LoaderManager.Discover();
 			LoaderManager.Enable(EntryPoint.MainEntry, Application.isBatchMode ? EntryPoint.ServerEntry : EntryPoint.ClientEntry);
-			#endif
-			await LoaderManager.Initialize();
-			_initialized = true;
+				#endif
+				await LoaderManager.Initialize();
+				_initialized = true;
+			} catch (Exception e) {
+				Logger.LogException(new Exception("Failed to start", e), this, nameof(RuntimeLoader));
+				_initialized = false;
+			}
 		}
 
-		private void Update()
-			=> LoaderManager.OnUpdate();
+		private void Update() {
+			if (!_initialized)
+				return;
+			try {
+				LoaderManager.OnUpdate();
+			} catch (Exception e) {
+				Logger.LogException(new Exception("Error in Update", e), this, nameof(RuntimeLoader));
+			}
+		}
 
-		private void FixedUpdate()
-		=> LoaderManager.OnFixedUpdate();
-		
-		private void LateUpdate()
-			=> LoaderManager.OnLateUpdate();
+		private void FixedUpdate() {
+			if (!_initialized)
+				return;
+			try {
+				LoaderManager.OnFixedUpdate();
+			} catch (Exception e) {
+				Logger.LogException(new Exception("Error in FixedUpdate", e), this, nameof(RuntimeLoader));
+			}
+		}
+
+		private void LateUpdate() {
+			if (!_initialized)
+				return;
+			try {
+				LoaderManager.OnLateUpdate();
+			} catch (Exception e) {
+				Logger.LogException(new Exception("Error in LateUpdate", e), this, nameof(RuntimeLoader));
+			}
+		}
 
 		private void OnDestroy()
 			=> OnDestroyAsync().Forget();
 
 		private async UniTask OnDestroyAsync() {
-			if (_instance != this) return;
-			Logger.Log($"{nameof(RuntimeLoader)} shutting down.", this);
+			if (_instance != this)
+				return;
+			Logger.Log($"Shutting down", this, nameof(RuntimeLoader));
 			#if UNITY_EDITOR
 			LoaderManager.Disable(EntryPoint.ServerEntry, EntryPoint.ClientEntry);
 			#else

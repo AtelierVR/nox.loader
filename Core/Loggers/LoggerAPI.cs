@@ -23,7 +23,7 @@ namespace Nox.ModLoader.Cores.Loggers {
 			=> Logger.LogDebug(message, tag: _mod.Metadata.GetId());
 
 		public void LogException(Exception exception)
-			=> Logger.LogError(exception, tag: _mod.Metadata.GetId());
+			=> Logger.LogException(exception, tag: _mod.Metadata.GetId());
 
 		public void Log(string message, Object context)
 			=> Logger.Log(message, context, tag: _mod.Metadata.GetId());
@@ -38,6 +38,6 @@ namespace Nox.ModLoader.Cores.Loggers {
 			=> Logger.LogDebug(message, context, tag: _mod.Metadata.GetId());
 
 		public void LogException(Exception exception, Object context)
-			=> Logger.LogError(exception, context, tag: _mod.Metadata.GetId());
+			=> Logger.LogException(exception, context, tag: _mod.Metadata.GetId());
 	}
 }
