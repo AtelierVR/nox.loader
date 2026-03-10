@@ -19,6 +19,11 @@ namespace Nox.ModLoader.Loader {
 			=> OnScriptsReloadedAsync().Forget();
 
 		private static async UniTask OnScriptsReloadedAsync() {
+			if (LoaderDisabled) {
+				Logger.LogDebug("Mod Loader is disabled in Editor mode. Skipping initialization.", tag: nameof(EditorLoader));
+				return;
+			}
+			
 			Logger.LogDebug("Initializing Mod Loader in Editor mode...", tag: nameof(EditorLoader));
 
 			Application.runInBackground = true;
@@ -108,6 +113,37 @@ namespace Nox.ModLoader.Loader {
 		#endregion
 
 		#region Startup Preferences
+		
+		public static bool LoaderDisabled {
+			get => Config.LoadEditor().Get("loader_disabled", false);
+			set {
+				var config = Config.LoadEditor();
+				config.Set("loader_disabled", value);
+				config.Save();
+			}
+		}
+		
+		[MenuItem("Nox/Loader/Disable")]
+		public static void DisableLoader() {
+			if (LoaderDisabled) {
+				Logger.Log("Loader is already disabled...");
+				return;
+			}
+
+			LoaderDisabled = true;
+			Logger.Log("Loader Disabled... Please restart the editor to take effect.");
+		}
+		
+		[MenuItem("Nox/Loader/Enable")]
+		public static void EnableLoader() {
+			if (!LoaderDisabled) {
+				Logger.Log("Loader is already enabled...");
+				return;
+			}
+			
+			LoaderDisabled = false;
+			Logger.Log("Loader Enabled... Please restart the editor to take effect.");
+		}
 
 		[MenuItem("Nox/Play Mode/Wants To Load/Force Yes")]
 		public static void WantsToLoadYes() {
