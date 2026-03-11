@@ -11,7 +11,7 @@ using UnityEditor;
 using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.ModLoader.Loader {
-	public class EditorLoader {
+	public static class EditorLoader {
 		#region Loader Initialization
 
 		[UnityEditor.Callbacks.DidReloadScripts]

@@ -1,11 +1,8 @@
-using System;
-using Nox.CCK.Mods.Initializers;
-using System.Linq;
 using Cysharp.Threading.Tasks;
 using Nox.CCK.Utils;
 
 namespace Nox.ModLoader.Loader {
-	public class LoaderManager {
+	public static class LoaderManager {
 		#if UNITY_EDITOR
 		public static void OnEnterPlayMode() {
 			var mods = ModManager.GetMods();

@@ -56,7 +56,7 @@ namespace Nox.ModLoader {
 
 		public static async UniTask<ResultLoadInfos> LoadMods(IDiscover discover) {
 			EnsureInitialized();
-
+			
 			var mods     = new List<Mod>();
 			var packages = discover.FindAllPackages();
 

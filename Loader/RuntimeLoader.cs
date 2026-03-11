@@ -58,8 +58,8 @@ namespace Nox.ModLoader.Loader {
 				#if UNITY_EDITOR
 				LoaderManager.Enable(Application.isBatchMode ? EntryPoint.ServerEntry : EntryPoint.ClientEntry);
 				#else
-			await LoaderManager.Discover();
-			LoaderManager.Enable(EntryPoint.MainEntry, Application.isBatchMode ? EntryPoint.ServerEntry : EntryPoint.ClientEntry);
+				await LoaderManager.Discover();
+				LoaderManager.Enable(EntryPoint.MainEntry, Application.isBatchMode ? EntryPoint.ServerEntry : EntryPoint.ClientEntry);
 				#endif
 				await LoaderManager.Initialize();
 				_initialized = true;
