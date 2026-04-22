@@ -19,6 +19,7 @@ namespace Nox.ModLoader {
 		internal readonly Cores.Events.EventAPI   LocalEventAPI;
 		internal readonly Cores.Configs.ConfigAPI LocalConfigAPI;
 		internal readonly Cores.Loggers.LoggerAPI LocalLoggerAPI;
+		internal readonly Core.Libs.LibAPI        LocalLibAPI;
 
 		public CoreAPI(Mods.Mod mod) {
 			Mod            = mod;
@@ -27,6 +28,7 @@ namespace Nox.ModLoader {
 			LocalEventAPI  = new Cores.Events.EventAPI(mod, EventEntryFlags.Main);
 			LocalConfigAPI = new Cores.Configs.ConfigAPI(mod);
 			LocalLoggerAPI = new Cores.Loggers.LoggerAPI(mod);
+			LocalLibAPI    = new Core.Libs.LibAPI(mod);
 		}
 
 		public IModMetadata ModMetadata
@@ -38,6 +40,8 @@ namespace Nox.ModLoader {
 		public EditorLibsAPI LibsAPI
 			=> throw new System.NotImplementedException();
 
+		public ILibAPI LibAPI
+			=> LocalLibAPI;
 
 		public IAssetAPI AssetAPI
 			=> Mod.AssetAPI;
