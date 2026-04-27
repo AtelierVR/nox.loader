@@ -24,7 +24,12 @@ namespace Nox.ModLoader.Cores.Assets {
             path = Path.GetFullPath(path);
 
             // Absolute path
-            var folders = new[] { (Application.dataPath, "Assets"), (Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Packages")), "Packages"), (Application.streamingAssetsPath, "StreamingAssets"), (Application.persistentDataPath, "PersistentDataPath") };
+            var folders = new[] { 
+                (Application.dataPath, "Assets"), 
+                (Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Packages")), "Packages"), 
+                (Application.streamingAssetsPath, "StreamingAssets"), 
+                (Application.persistentDataPath, "PersistentDataPath") 
+            };
 
             foreach (var folder in folders) {
                 if (!path.StartsWith(folder.Item1, StringComparison.OrdinalIgnoreCase)) continue;
