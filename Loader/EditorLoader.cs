@@ -19,6 +19,11 @@ namespace Nox.ModLoader.Loader {
 			=> OnScriptsReloadedAsync().Forget();
 
 		private static async UniTask OnScriptsReloadedAsync() {
+			if (Application.isBatchMode) {
+				Logger.LogDebug("Mod Loader skipped in batchmode.", tag: nameof(EditorLoader));
+				return;
+			}
+
 			if (LoaderDisabled) {
 				Logger.LogDebug("Mod Loader is disabled in Editor mode. Skipping initialization.", tag: nameof(EditorLoader));
 				return;

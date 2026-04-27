@@ -339,16 +339,14 @@ namespace Nox.ModLoader.Cores.Assets {
         public bool IsLoaded()
             => _loaded;
 
-        public async UniTask<bool> RegisterAssets() {
-            await UniTask.Yield();
+        public UniTask<bool> RegisterAssets() {
             _loaded = true;
-            return true;
+            return UniTask.FromResult(true);
         }
 
-        public async UniTask<bool> UnRegisterAssets() {
-            await UniTask.Yield();
+        public UniTask<bool> UnRegisterAssets() {
             _loaded = false;
-            return true;
+            return UniTask.FromResult(true);
         }
     }
 
