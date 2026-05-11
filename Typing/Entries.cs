@@ -23,7 +23,7 @@ namespace Nox.ModLoader.Typing {
             : Array.Empty<string>();
 
         public Dictionary<string, string[]> GetAll()
-            => _entries;
+            => _entries ?? new Dictionary<string, string[]>();
 
         public JObject ToJson() {
             var obj = new JObject();

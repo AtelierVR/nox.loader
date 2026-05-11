@@ -40,8 +40,7 @@ namespace Nox.ModLoader.Mods {
 				.Where(i => i.IsCompatible());
 
 			// Retrieve all entrypoints to detect corresponding assemblies
-			var namespaces = (Metadata.GetEntryPoints()?.GetAll()
-				?? new System.Collections.Generic.Dictionary<string, string[]>())
+			var namespaces = Metadata.GetEntryPoints().GetAll()
 				.SelectMany(e => e.Value)
 				.Select(e =>
 				{

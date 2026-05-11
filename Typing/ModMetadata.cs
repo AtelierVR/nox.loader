@@ -338,7 +338,7 @@ namespace Nox.ModLoader.Typing {
         /// </summary>
         /// <returns></returns>
         public IEntries GetEntryPoints()
-            => GetInternalEntryPoints() as IEntries;
+            => GetInternalEntryPoints() as IEntries ?? new Entries();
 
         internal Entries GetInternalEntryPoints()
             => _entryPoints;
