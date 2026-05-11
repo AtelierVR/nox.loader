@@ -107,7 +107,9 @@ namespace Nox.ModLoader.Mods {
 		public virtual UniTask<bool> Load() {
 			CoreAPI.EventAPI.Emit(new ModEventContext("mod_loaded", this));
 
-			var entryPointKeys = Metadata.GetEntryPoints().GetAll().Keys;
+			var allEntryPoints = Metadata.GetEntryPoints()?.GetAll()
+				?? new Dictionary<string, string[]>();
+			var entryPointKeys = allEntryPoints.Keys;
 			_entryPoints = new EntryPoint[entryPointKeys.Count];
 			var index = 0;
 			foreach (var entry in entryPointKeys) _entryPoints[index++] = new EntryPoint(this, entry);

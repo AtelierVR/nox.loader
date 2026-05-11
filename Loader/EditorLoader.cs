@@ -144,37 +144,44 @@ namespace Nox.ModLoader.Loader {
 			return true;
 		}
 
-		[MenuItem("Nox/Play Mode/Wants To Load/Force Yes")]
+		private const string WantsToLoadForceOnMenuPath  = "Nox/Play Mode/Wants To Load/Force On";
+		private const string WantsToLoadForceOffMenuPath = "Nox/Play Mode/Wants To Load/Force Off";
+		private const string WantsToLoadAskMenuPath      = "Nox/Play Mode/Wants To Load/Ask every time";
+
+		[MenuItem(WantsToLoadForceOnMenuPath, false)]
 		public static void WantsToLoadYes() {
-			if (WantsTo == WantsToLoad.Yes) {
-				Logger.Log("Wants to load is already set to Yes...");
-				return;
-			}
-
 			WantsTo = WantsToLoad.Yes;
-			Logger.Log("Wants to load set to Yes...");
+			Logger.Log("Wants to load set to Force On...");
 		}
 
-		[MenuItem("Nox/Play Mode/Wants To Load/Force No")]
+		[MenuItem(WantsToLoadForceOnMenuPath, true)]
+		private static bool WantsToLoadYesValidate() {
+			Menu.SetChecked(WantsToLoadForceOnMenuPath, WantsTo == WantsToLoad.Yes);
+			return true;
+		}
+
+		[MenuItem(WantsToLoadForceOffMenuPath, false)]
 		public static void WantsToLoadNo() {
-			if (WantsTo == WantsToLoad.No) {
-				Logger.Log("Wants to load is already set to No...");
-				return;
-			}
-
 			WantsTo = WantsToLoad.No;
-			Logger.Log("Wants to load set to No...");
+			Logger.Log("Wants to load set to Force Off...");
 		}
 
-		[MenuItem("Nox/Play Mode/Wants To Load/Ask every time")]
-		public static void WantsToLoadAsk() {
-			if (WantsTo == WantsToLoad.None) {
-				Logger.Log("Wants to load is already set to Ask every time...");
-				return;
-			}
+		[MenuItem(WantsToLoadForceOffMenuPath, true)]
+		private static bool WantsToLoadNoValidate() {
+			Menu.SetChecked(WantsToLoadForceOffMenuPath, WantsTo == WantsToLoad.No);
+			return true;
+		}
 
+		[MenuItem(WantsToLoadAskMenuPath, false)]
+		public static void WantsToLoadAsk() {
 			WantsTo = WantsToLoad.None;
-			Logger.Log("Wants to load set to None...");
+			Logger.Log("Wants to load set to Ask every time...");
+		}
+
+		[MenuItem(WantsToLoadAskMenuPath, true)]
+		private static bool WantsToLoadAskValidate() {
+			Menu.SetChecked(WantsToLoadAskMenuPath, WantsTo == WantsToLoad.None);
+			return true;
 		}
 
 		private const string AutoStartMenuPath = "Nox/Play Mode/Auto Start";
