@@ -375,11 +375,11 @@
 }
 
 .notification {
-    border-left-color: var(--unity-colors-default-border);
-    border-right-color: var(--unity-colors-default-border);
-    border-top-color: var(--unity-colors-default-border);
-    border-bottom-color: var(--unity-colors-default-border);
-    background-color: var(--unity-colors-default-background);
+    border-left-color: rgb(90, 90, 90);
+    border-right-color: rgb(90, 90, 90);
+    border-top-color: rgb(90, 90, 90);
+    border-bottom-color: rgb(90, 90, 90);
+    background-color: rgb(45, 45, 45);
     border-top-width: 1px;
     border-right-width: 1px;
     border-bottom-width: 1px;
@@ -388,10 +388,10 @@
     padding-right: 8px;
     padding-bottom: 8px;
     padding-left: 8px;
-    border-top-left-radius: var(--unity-metrics-default-border_radius);
-    border-top-right-radius: var(--unity-metrics-default-border_radius);
-    border-bottom-right-radius: var(--unity-metrics-default-border_radius);
-    border-bottom-left-radius: var(--unity-metrics-default-border_radius);
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+    border-bottom-left-radius: 4px;
     margin-bottom: 8px;
     flex-direction: row;
     color: rgb(240, 240, 240);
@@ -402,7 +402,7 @@
     height: 24px;
     background-image: resource('icons/info');
     margin-right: 8px;
-    -unity-background-image-tint-color: rgb(240, 240, 240);
+    -unity-background-image-tint-color: rgb(100, 160, 240);
 }
 
 .notification .label {
@@ -411,46 +411,52 @@
     flex-grow: 1;
 }
 
+/* Warning — Unity amber #C8970A */
 .notification-warning.notification,
 .notification-warning .notification {
-    background-color: var(--unity-colors-warning-background);
-    border-left-color: var(--unity-colors-warning-border);
-    border-right-color: var(--unity-colors-warning-border);
-    border-top-color: var(--unity-colors-warning-border);
-    border-bottom-color: var(--unity-colors-warning-border);
-    color: var(--unity-colors-warning-text);
+    border-left-color: rgb(200, 151, 10);
+    border-right-color: rgb(200, 151, 10);
+    border-top-color: rgb(200, 151, 10);
+    border-bottom-color: rgb(200, 151, 10);
 }
 
+/* Error — Unity red #C83232 */
 .notification-error.notification,
 .notification-error .notification {
-    background-color: var(--unity-colors-error-background);
-    border-left-color: var(--unity-colors-error-border);
-    border-right-color: var(--unity-colors-error-border);
-    border-top-color: var(--unity-colors-error-border);
-    border-bottom-color: var(--unity-colors-error-border);
-    color: var(--unity-colors-error-text);
+    border-left-color: rgb(200, 50, 50);
+    border-right-color: rgb(200, 50, 50);
+    border-top-color: rgb(200, 50, 50);
+    border-bottom-color: rgb(200, 50, 50);
 }
 
-.notification-success .notification,
-.notification-success.notification {
-    background-color: var(--unity-colors-success-background);
-    border-left-color: var(--unity-colors-success-border);
-    border-right-color: var(--unity-colors-success-border);
-    border-top-color: var(--unity-colors-success-border);
-    border-bottom-color: var(--unity-colors-success-border);
-    color: var(--unity-colors-success-text);
+/* Success — Unity green #3AAB3A */
+.notification-success.notification,
+.notification-success .notification {
+    border-left-color: rgb(58, 171, 58);
+    border-right-color: rgb(58, 171, 58);
+    border-top-color: rgb(58, 171, 58);
+    border-bottom-color: rgb(58, 171, 58);
 }
 
+.notification-warning.notification .icon,
+.notification-warning .notification .icon,
 .notification-warning .icon {
     background-image: resource('icons/warning');
+    -unity-background-image-tint-color: rgb(200, 151, 10);
 }
 
+.notification-error.notification .icon,
+.notification-error .notification .icon,
 .notification-error .icon {
     background-image: resource('icons/error');
+    -unity-background-image-tint-color: rgb(200, 50, 50);
 }
 
+.notification-success.notification .icon,
+.notification-success .notification .icon,
 .notification-success .icon {
     background-image: resource('icons/success');
+    -unity-background-image-tint-color: rgb(58, 171, 58);
 }
 
 .notification .icon-container {
@@ -504,16 +510,6 @@
     padding-right: 8px;
     padding-bottom: 8px;
     padding-left: 8px;
-}
-
-.notification-warning .notification * {
-    color: rgb(51, 51, 51);
-    -unity-background-image-tint-color: rgb(51, 51, 51);
-}
-
-.notification-warning.notification * {
-    color: rgb(51, 51, 51);
-    -unity-background-image-tint-color: rgb(51, 51, 51);
 }
 
 .field-label {
