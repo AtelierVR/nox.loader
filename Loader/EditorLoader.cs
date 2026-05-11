@@ -128,26 +128,20 @@ namespace Nox.ModLoader.Loader {
 			}
 		}
 		
-		[MenuItem("Nox/Loader/Disable")]
-		public static void DisableLoader() {
-			if (LoaderDisabled) {
-				Logger.Log("Loader is already disabled...");
-				return;
-			}
+		private const string LoaderMenuPath = "Nox/Loader/Enable";
 
-			LoaderDisabled = true;
-			Logger.Log("Loader Disabled... Please restart the editor to take effect.");
+		[MenuItem(LoaderMenuPath, false)]
+		public static void ToggleLoader() {
+			LoaderDisabled = !LoaderDisabled;
+			Logger.Log(LoaderDisabled
+				? "Loader Disabled... Please restart the editor to take effect."
+				: "Loader Enabled... Please restart the editor to take effect.");
 		}
-		
-		[MenuItem("Nox/Loader/Enable")]
-		public static void EnableLoader() {
-			if (!LoaderDisabled) {
-				Logger.Log("Loader is already enabled...");
-				return;
-			}
-			
-			LoaderDisabled = false;
-			Logger.Log("Loader Enabled... Please restart the editor to take effect.");
+
+		[MenuItem(LoaderMenuPath, true)]
+		private static bool ToggleLoaderValidate() {
+			Menu.SetChecked(LoaderMenuPath, !LoaderDisabled);
+			return true;
 		}
 
 		[MenuItem("Nox/Play Mode/Wants To Load/Force Yes")]
@@ -183,28 +177,22 @@ namespace Nox.ModLoader.Loader {
 			Logger.Log("Wants to load set to None...");
 		}
 
-		[MenuItem("Nox/Play Mode/Auto Start Enable")]
-		private static void AutoStartEnable() {
-			if (AutoStart) {
-				Logger.Log("Auto Start is already enabled...");
-				return;
-			}
+		private const string AutoStartMenuPath = "Nox/Play Mode/Auto Start";
 
-			AutoStart = true;
-			Logger.Log("Auto Start Enabled...");
-			if (EditorApplication.isPlaying)
+		[MenuItem(AutoStartMenuPath, false)]
+		private static void ToggleAutoStart() {
+			AutoStart = !AutoStart;
+			Logger.Log(AutoStart
+				? "Auto Start Enabled..."
+				: "Auto Start Disabled... It's effective next time you enter Play Mode.");
+			if (AutoStart && EditorApplication.isPlaying)
 				OnPlayModeStateChanged(PlayModeStateChange.EnteredPlayMode);
 		}
 
-		[MenuItem("Nox/Play Mode/Auto Start Disable")]
-		private static void AutoStartDisable() {
-			if (!AutoStart) {
-				Logger.Log("Auto Start is already disabled...");
-				return;
-			}
-
-			AutoStart = false;
-			Logger.Log("Auto Start Disabled... It's effective next time you enter Play Mode.");
+		[MenuItem(AutoStartMenuPath, true)]
+		private static bool ToggleAutoStartValidate() {
+			Menu.SetChecked(AutoStartMenuPath, AutoStart);
+			return true;
 		}
 
 		private enum WantsToLoad : byte {
