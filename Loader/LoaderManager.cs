@@ -110,6 +110,7 @@ namespace Nox.ModLoader.Loader {
 				);
 
 				await mod.Initialize();
+				await UniTask.SwitchToMainThread();
 			}
 
 			Logger.ShowProgress(nameof(LoaderManager), "Post-Initializing Mods...", 0.5f);
@@ -122,6 +123,7 @@ namespace Nox.ModLoader.Loader {
 				);
 
 				await mod.PostInitialize();
+				await UniTask.SwitchToMainThread();
 			}
 
 			Logger.ClearProgress();
@@ -144,6 +146,7 @@ namespace Nox.ModLoader.Loader {
 				);
 
 				await mod.PreDispose();
+				await UniTask.SwitchToMainThread();
 			}
 
 			Logger.ShowProgress(nameof(LoaderManager), "Disposing Mods...", 0.5f);
@@ -156,6 +159,7 @@ namespace Nox.ModLoader.Loader {
 				);
 
 				await mod.Dispose();
+				await UniTask.SwitchToMainThread();
 			}
 
 			Logger.ClearProgress();
