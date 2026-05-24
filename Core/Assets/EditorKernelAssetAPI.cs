@@ -20,24 +20,27 @@ namespace Nox.ModLoader.Cores.Assets {
         private readonly ModLoader.Mods.KernelMod _kernelMod;
         private bool _loaded;
 
+        private static (string abs, string rel)[] _folders;
+
+        private static (string abs, string rel)[] GetFolders() {
+            if (_folders != null) return _folders;
+            return _folders = new[] {
+                (Application.dataPath, "Assets"),
+                (Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Packages")), "Packages"),
+                (Application.streamingAssetsPath, "StreamingAssets"),
+                (Application.persistentDataPath, "PersistentDataPath")
+            };
+        }
+
         public static string ToRelative(string path) {
             path = Path.GetFullPath(path);
 
-            // Absolute path
-            var folders = new[] { 
-                (Application.dataPath, "Assets"), 
-                (Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Packages")), "Packages"), 
-                (Application.streamingAssetsPath, "StreamingAssets"), 
-                (Application.persistentDataPath, "PersistentDataPath") 
-            };
-
-            foreach (var folder in folders) {
-                if (!path.StartsWith(folder.Item1, StringComparison.OrdinalIgnoreCase)) continue;
-                var relativePath = path[folder.Item1.Length..].TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                return Path.Combine(folder.Item2, relativePath);
+            foreach (var folder in GetFolders()) {
+                if (!path.StartsWith(folder.abs, StringComparison.OrdinalIgnoreCase)) continue;
+                var relativePath = path[folder.abs.Length..].TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                return Path.Combine(folder.rel, relativePath);
             }
 
-            // Not found
             Logger.LogWarning($"Path '{path}' is not in Assets, Packages, StreamingAssets or PersistentDataPath.");
             return path;
         }
@@ -64,11 +67,14 @@ namespace Nox.ModLoader.Cores.Assets {
             where T : Object {
             path = AssetAPIExtension.Resolve(path, _kernelMod);
             // get on Internal mod
-            if (HasInternalAsset<T>(path)) return GetInternalAsset<T>(path);
+            var result = GetInternalAsset<T>(path);
+            if (result) return result;
 
             // get on other mods
-            foreach (var m in AssetAPIExtension.GetOtherLoadedMods(_kernelMod, path.Namespace)
-                                               .Where(m => m.AssetAPI.HasInternalAsset<T>(path))) return m.AssetAPI.GetInternalAsset<T>(path);
+            foreach (var m in AssetAPIExtension.GetOtherLoadedMods(_kernelMod, path.Namespace)) {
+                result = m.AssetAPI.GetInternalAsset<T>(path);
+                if (result) return result;
+            }
 
             // get from the initial mod
             var mod = ModManager.GetMod(path.Namespace);
@@ -121,11 +127,13 @@ namespace Nox.ModLoader.Cores.Assets {
             where T : Object {
             path = AssetAPIExtension.Resolve(path, _kernelMod);
             // get on Internal mod
-            if (await HasInternalAssetAsync<T>(path)) return await GetInternalAssetAsync<T>(path);
+            var result = await GetInternalAssetAsync<T>(path);
+            if (result) return result;
 
             // get on other mods
             foreach (var m in AssetAPIExtension.GetOtherLoadedMods(_kernelMod, path.Namespace)) {
-                if (await m.AssetAPI.HasInternalAssetAsync<T>(path)) return await m.AssetAPI.GetInternalAssetAsync<T>(path);
+                result = await m.AssetAPI.GetInternalAssetAsync<T>(path);
+                if (result) return result;
             }
 
             // get from the initial mod
