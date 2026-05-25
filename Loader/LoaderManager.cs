@@ -136,13 +136,14 @@ namespace Nox.ModLoader.Loader {
 				return;
 			}
 
+			// Dispose in reverse initialization order so dependants are disposed before their dependencies
 			Logger.ShowProgress(nameof(LoaderManager), "Pre-Disposing Mods...", 0f);
-			for (var i = 0; i < mods.Length; i++) {
+			for (var i = mods.Length - 1; i >= 0; i--) {
 				var mod = mods[i];
 				Logger.ShowProgress(
 					nameof(LoaderManager),
 					$"Pre-Disposing {mod.Metadata.GetId()}@{mod.Metadata.GetVersion()}...",
-					(float)(i + 1) / mods.Length / 2
+					(float)(mods.Length - i) / mods.Length / 2
 				);
 
 				await mod.PreDispose();
@@ -150,12 +151,12 @@ namespace Nox.ModLoader.Loader {
 			}
 
 			Logger.ShowProgress(nameof(LoaderManager), "Disposing Mods...", 0.5f);
-			for (var i = 0; i < mods.Length; i++) {
+			for (var i = mods.Length - 1; i >= 0; i--) {
 				var mod = mods[i];
 				Logger.ShowProgress(
 					nameof(LoaderManager),
 					$"Disposing {mod.Metadata.GetId()}@{mod.Metadata.GetVersion()}...",
-					0.5f + (float)(i + 1) / mods.Length / 2
+					0.5f + (float)(mods.Length - i) / mods.Length / 2
 				);
 
 				await mod.Dispose();

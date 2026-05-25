@@ -73,15 +73,20 @@ namespace Nox.ModLoader.Loader {
 					// Stop runtime entries
 					RuntimeLoader.Disable();
 
-					// Notify mods that play mode is exited
+					// Notify enabled mods before disabling
 					LoaderManager.OnExitPlayMode();
 
-					// Re-add editor update
-					EditorApplication.update += LoaderManager.OnUpdate;
+					// Disable runtime entries synchronously to stop updates immediately
+					// Must happen BEFORE re-adding EditorApplication.update
+					LoaderManager.Disable(EntryPoint.MainEntry, EntryPoint.ServerEntry, EntryPoint.ClientEntry);
 
-					ReloadMods();
+					// Re-add editor update (safe now that runtime entries are disabled)
+					EditorApplication.update += LoaderManager.OnUpdate;
 					break;
 				case PlayModeStateChange.EnteredEditMode:
+					// Reload mods once edit mode is fully entered (isPlaying is false here)
+					ReloadMods();
+					break;
 				case PlayModeStateChange.ExitingEditMode:
 				default:
 					break;

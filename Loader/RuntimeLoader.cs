@@ -106,14 +106,14 @@ namespace Nox.ModLoader.Loader {
 			if (_instance != this)
 				return;
 			Logger.Log($"Shutting down", this, nameof(RuntimeLoader));
+			_initialized = false;
+			_instance    = null;
 			#if UNITY_EDITOR
 			LoaderManager.Disable(EntryPoint.ServerEntry, EntryPoint.ClientEntry);
 			#else
 			LoaderManager.Disable(EntryPoint.MainEntry, EntryPoint.ServerEntry, EntryPoint.ClientEntry);
 			#endif
 			await LoaderManager.Dispose();
-			_initialized = false;
-			_instance    = null;
 		}
 	}
 }
