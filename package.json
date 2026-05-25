@@ -1,5 +1,6 @@
-{
-  "name": "nox.loader",
-  "displayName": "Nox - Mod Loader",
-  "version": "1.0.0"
+﻿{
+    "name":  "nox.loader",
+    "displayName":  "Nox - Mod Loader",
+    "version":  "1.0.0",
+    "description":  "Mod loader and lifecycle manager for loading, initializing, and unloading Nox mods."
 }
