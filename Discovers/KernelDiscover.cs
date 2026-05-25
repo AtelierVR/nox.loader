@@ -30,26 +30,35 @@ namespace Nox.ModLoader.Discovers {
 			#if UNITY_EDITOR
 			files = files.Concat(Directory.GetFiles(Path.Combine(Application.dataPath, "..", "Packages"), "*.asmdef", SearchOption.AllDirectories)).ToArray();
 			#endif
-			
+
 
 			foreach (var file in files) {
-				var obj = JObject.Parse(File.ReadAllText(file));
-				if (!obj.TryGetValue("name", out _)) continue;
-				var noxmod = Directory
-					.GetFiles(Path.GetDirectoryName(file) ?? string.Empty, "nox.mod.json*", SearchOption.TopDirectoryOnly)
-					.FirstOrDefault();
-				if (noxmod == null) continue;
-				var noxobj = ModMetadata.LoadFromPath(noxmod);
-				if (noxobj == null) continue;
-				noxobj.InternalData["folder"]     = Path.GetDirectoryName(file);
-				noxobj.InternalData["definition"] = file;
-				noxobj.InternalData["manifest"]   = noxmod;
-				noxobj.InternalData["assets"]     = Path.Combine(Path.GetDirectoryName(file) ?? string.Empty, "assets");
-				noxobj.InternalDDiscover          = this;
-				packages.Add(noxobj);
+				try {
+					var obj = JObject.Parse(File.ReadAllText(file));
+					if (!obj.TryGetValue("name", out _))
+						continue;
+					var noxmod = Directory
+						.GetFiles(Path.GetDirectoryName(file) ?? string.Empty, "nox.mod.json*", SearchOption.TopDirectoryOnly)
+						.FirstOrDefault();
+					if (noxmod == null)
+						continue;
+					var noxobj = ModMetadata.LoadFromPath(noxmod);
+					if (noxobj == null)
+						continue;
+					noxobj.InternalData["folder"]     = Path.GetDirectoryName(file);
+					noxobj.InternalData["definition"] = file;
+					noxobj.InternalData["manifest"]   = noxmod;
+					noxobj.InternalData["assets"]     = Path.Combine(Path.GetDirectoryName(file) ?? string.Empty, "assets");
+					noxobj.InternalDDiscover          = this;
+					packages.Add(noxobj);
+				} catch (Exception e) {
+					Logger.LogError(new Exception($"Error loading mod metadata from {file}", e));
+					continue;
+				}
 			}
 
-			if (packages.Count == 0) return Array.Empty<ModMetadata>();
+			if (packages.Count == 0)
+				return Array.Empty<ModMetadata>();
 
 			Logger.LogDebug("Found " + packages.Count + " kernel mod(s):");
 			foreach (var package in packages)
@@ -96,13 +105,16 @@ namespace Nox.ModLoader.Discovers {
 		public ModMetadata FindPackage(string id) {
 			var asmdef = Directory.GetFiles(Application.dataPath, id + ".asmdef", SearchOption.AllDirectories)
 				.FirstOrDefault();
-			if (asmdef == null) return null;
+			if (asmdef == null)
+				return null;
 			var noxmod = Directory
 				.GetFiles(Path.GetDirectoryName(asmdef) ?? string.Empty, "nox.mod.json*", SearchOption.TopDirectoryOnly)
 				.FirstOrDefault();
-			if (noxmod == null) return null;
+			if (noxmod == null)
+				return null;
 			var noxobj = ModMetadata.LoadFromPath(noxmod);
-			if (noxobj == null) return null;
+			if (noxobj == null)
+				return null;
 			noxobj.InternalData["folder"] = Path.GetDirectoryName(asmdef);
 			noxobj.InternalDDiscover      = this;
 			return noxobj;
