@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using Cysharp.Threading.Tasks;
+using Nox.CCK.Mods.Assets;
 using Nox.ModLoader.Assemblies;
 using Nox.ModLoader.Cores.Assets;
 using Nox.ModLoader.Mods.Helpers;
@@ -125,6 +126,10 @@ namespace Nox.ModLoader.Mods {
 					Logger.LogError($"Failed to register assets for mod {Metadata.GetId()}");
 					return false;
 				}
+
+				#if UNITY_EDITOR
+				EditorGlobalAsset.Register(AssetAPI);
+				#endif
 
 				_isLoaded = true;
 				return await base.Load();
@@ -306,6 +311,9 @@ namespace Nox.ModLoader.Mods {
 				#endif
 
 				// Unregister assets
+				#if UNITY_EDITOR
+				EditorGlobalAsset.Unregister(AssetAPI);
+				#endif
 				if (!await AssetAPI.UnRegisterAssets())
 					Logger.LogWarning($"Failed to unregister assets for mod {Metadata.GetId()}");
 

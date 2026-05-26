@@ -10,6 +10,7 @@ using System.Linq;
 using Cysharp.Threading.Tasks;
 using Nox.CCK.Utils;
 using UnityEditor;
+using Nox.CCK;
 
 namespace Nox.ModLoader.Cores.Assets {
 
@@ -21,6 +22,8 @@ namespace Nox.ModLoader.Cores.Assets {
 		private bool _loaded;
 
 		private static (string abs, string rel)[] _folders;
+		public override string ToString() 
+			=> $"{GetType().Name}[Id={_kernelMod.Metadata.GetId()}, Version={_kernelMod.Metadata.GetVersion()}]";
 
 		private static (string abs, string rel)[] GetFolders() {
 			if (_folders != null)
@@ -46,7 +49,6 @@ namespace Nox.ModLoader.Cores.Assets {
 			Logger.LogWarning($"Path '{path}' is not in Assets, Packages, StreamingAssets or PersistentDataPath.");
 			return path;
 		}
-
 		public static string FormatPath(string path)
 			=> AssetAPIExtension.FormatPath(path);
 
@@ -94,7 +96,9 @@ namespace Nox.ModLoader.Cores.Assets {
 
 			foreach (var n in namespaces) {
 				var dirpath = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
-				if (File.Exists(dirpath))
+				var symbolic = AssetDatabase.LoadAssetAtPath<SymbolicAsset>(dirpath + ".asset");
+				if (symbolic) return HasAsset<T>(symbolic.Target);
+				if (AssetDatabase.LoadAssetAtPath<T>(dirpath))
 					return true;
 			}
 
@@ -108,7 +112,9 @@ namespace Nox.ModLoader.Cores.Assets {
 
 			foreach (var n in namespaces) {
 				var dirpath = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
-				var asset   = AssetDatabase.LoadAssetAtPath<T>(dirpath);
+				var symbolic = AssetDatabase.LoadAssetAtPath<SymbolicAsset>(dirpath + ".asset");
+				if (symbolic) return GetAsset<T>(symbolic.Target);
+				var asset = AssetDatabase.LoadAssetAtPath<T>(dirpath);
 				if (asset)
 					return asset;
 			}
@@ -162,7 +168,8 @@ namespace Nox.ModLoader.Cores.Assets {
 
 			foreach (var n in namespaces) {
 				var dirpath = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
-				if (File.Exists(dirpath))
+				if (AssetDatabase.LoadAssetAtPath<SymbolicAsset>(dirpath + ".asset")) return true;
+				if (AssetDatabase.LoadAssetAtPath<T>(dirpath))
 					return true;
 			}
 
@@ -178,7 +185,9 @@ namespace Nox.ModLoader.Cores.Assets {
 
 			foreach (var n in namespaces) {
 				var dirpath = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
-				var asset   = AssetDatabase.LoadAssetAtPath<T>(dirpath);
+				var symbolic = AssetDatabase.LoadAssetAtPath<SymbolicAsset>(dirpath + ".asset");
+				if (symbolic) return await GetAssetAsync<T>(symbolic.Target);
+				var asset = AssetDatabase.LoadAssetAtPath<T>(dirpath);
 				if (asset)
 					return asset;
 			}

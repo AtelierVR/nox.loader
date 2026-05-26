@@ -8,6 +8,7 @@ using System.Linq;
 using Cysharp.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using Nox.CCK.Utils;
+using Nox.CCK;
 
 namespace Nox.ModLoader.Cores.Assets {
 
@@ -18,6 +19,9 @@ namespace Nox.ModLoader.Cores.Assets {
         private readonly ModLoader.Mods.KernelMod _kernelMod;
         private List<AssetBundle> _assetBundles;
         private bool _loaded;
+
+        public override string ToString() 
+            => $"{GetType().Name}[Id={_kernelMod.Metadata.GetId()}, Version={_kernelMod.Metadata.GetVersion()}]";
 
         public bool HasAsset<T>(ResourceIdentifier path)
             where T : Object {
@@ -54,7 +58,15 @@ namespace Nox.ModLoader.Cores.Assets {
             var namespaces = AssetAPIExtension.GetNamespaces(path);
 
             foreach (var n in namespaces) {
-                if (!string.IsNullOrEmpty(HasAssetFromBundle(n, path.Path))) return true;
+                var bundlePath = HasAssetFromBundle(n, path.Path);
+                if (bundlePath == null) continue;
+
+                foreach (var bundle in _assetBundles) {
+                    if (!bundle.Contains(bundlePath)) continue;
+                    var raw = bundle.LoadAsset<Object>(bundlePath);
+                    if (raw is SymbolicAsset symbolic) return HasAsset<T>(symbolic.Target);
+                    return raw is T;
+                }
             }
 
             return false;
@@ -66,8 +78,15 @@ namespace Nox.ModLoader.Cores.Assets {
             var namespaces = AssetAPIExtension.GetNamespaces(path);
 
             foreach (var n in namespaces) {
-                var asset = GetAssetFromBundle<T>(n, path.Path);
-                if (asset != null) return asset;
+                var bundlePath = HasAssetFromBundle(n, path.Path);
+                if (bundlePath == null) continue;
+
+                foreach (var bundle in _assetBundles) {
+                    if (!bundle.Contains(bundlePath)) continue;
+                    var raw = bundle.LoadAsset<Object>(bundlePath);
+                    if (raw is SymbolicAsset symbolic) return GetAsset<T>(symbolic.Target);
+                    return raw as T;
+                }
             }
 
             return default;
@@ -126,8 +145,15 @@ namespace Nox.ModLoader.Cores.Assets {
             var namespaces = AssetAPIExtension.GetNamespaces(path);
 
             foreach (var n in namespaces) {
-                var asset = GetAssetFromBundle<T>(n, path.Path);
-                if (asset != null) return asset;
+                var bundlePath = HasAssetFromBundle(n, path.Path);
+                if (bundlePath == null) continue;
+
+                foreach (var bundle in _assetBundles) {
+                    if (!bundle.Contains(bundlePath)) continue;
+                    var raw = bundle.LoadAsset<Object>(bundlePath);
+                    if (raw is SymbolicAsset symbolic) return await GetAssetAsync<T>(symbolic.Target);
+                    return raw as T;
+                }
             }
 
             return default;

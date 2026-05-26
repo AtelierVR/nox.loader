@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Reflection;
 using Cysharp.Threading.Tasks;
+using Nox.CCK.Mods.Assets;
 using Nox.ModLoader.Cores.Assets;
 using Logger = Nox.CCK.Utils.Logger;
 
@@ -58,6 +59,10 @@ namespace Nox.ModLoader.Mods {
 			if (!await AssetAPI.RegisterAssets())
 				return false;
 
+			#if UNITY_EDITOR
+			EditorGlobalAsset.Register(AssetAPI);
+			#endif
+
 			return await base.Load();
 		}
 
@@ -66,6 +71,10 @@ namespace Nox.ModLoader.Mods {
 
 			if (!await base.Unload())
 				return false;
+
+			#if UNITY_EDITOR
+			EditorGlobalAsset.Unregister(AssetAPI);
+			#endif
 
 			return await AssetAPI.UnRegisterAssets();
 		}

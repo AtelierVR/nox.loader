@@ -8,6 +8,7 @@ using Nox.CCK.Utils;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Logger = Nox.CCK.Utils.Logger;
+using Nox.CCK;
 
 namespace Nox.ModLoader.Cores.Assets {
 
@@ -25,6 +26,10 @@ namespace Nox.ModLoader.Cores.Assets {
         public FolderAssetAPI(FolderMod mod) {
             _mod = mod;
         }
+		
+		public override string ToString() 
+			=> $"{GetType().Name}[Id={_mod.Metadata.GetId()}, Version={_mod.Metadata.GetVersion()}]";
+
 
         public bool IsLoaded() => _isLoaded;
 
@@ -132,7 +137,9 @@ namespace Nox.ModLoader.Cores.Assets {
             if (_mod.Metadata?.GetId() != path.Namespace) return false;
 
             if (!_loadedAssets.TryGetValue(path.Path, out var asset)) return false;
-            return asset is T;
+            if (asset is T) return true;
+            if (asset is SymbolicAsset symbolic) return HasAsset<T>(symbolic.Target);
+            return false;
         }
 
         public T GetInternalAsset<T>(ResourceIdentifier path)
@@ -140,8 +147,9 @@ namespace Nox.ModLoader.Cores.Assets {
             path = AssetAPIExtension.Resolve(path, _mod);
             if (_mod.Metadata?.GetId() != path.Namespace) return null;
 
-            if (_loadedAssets.TryGetValue(path.Path, out var asset)) return asset as T;
-            return null;
+            if (!_loadedAssets.TryGetValue(path.Path, out var asset)) return null;
+            if (asset is SymbolicAsset symbolic) return GetAsset<T>(symbolic.Target);
+            return asset as T;
         }
 
         #endregion
