@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using Nox.CCK.Mods.Assets;
-using Nox.CCK.Mods.Chats;
 using Nox.CCK.Mods.Configs;
 using Nox.CCK.Mods.Cores;
 using Nox.CCK.Mods.Events;
@@ -8,51 +6,44 @@ using Nox.CCK.Mods.Libs;
 using Nox.CCK.Mods.Loggers;
 using Nox.CCK.Mods.Metadata;
 using Nox.CCK.Mods.Mods;
-using Nox.ModLoader.Typing;
 
 namespace Nox.ModLoader {
 	public class CoreAPI : IModCoreAPI, IMainModCoreAPI, IServerModCoreAPI, IClientModCoreAPI, IEditorModCoreAPI {
-		internal readonly Mods.Mod                Mod;
-		internal readonly Cores.Mods.ModAPI       LocalModAPI;
-		internal readonly Cores.Events.EventAPI   LocalEventAPI;
-		internal readonly Cores.Configs.ConfigAPI LocalConfigAPI;
-		internal readonly Cores.Loggers.LoggerAPI LocalLoggerAPI;
-		internal readonly Core.Libs.LibAPI        LocalLibAPI;
+		internal Mods.Mod                Mod;
+        internal Cores.Mods.ModAPI ModAPI { get; }
+        internal Cores.Events.EventAPI EventAPI { get; }
+        internal Cores.Configs.ConfigAPI ConfigAPI { get; }
+        internal Cores.Loggers.LoggerAPI LoggerAPI { get; }
+        internal Core.Libs.LibAPI LibAPI { get; }
 
-		public CoreAPI(Mods.Mod mod) {
+        public CoreAPI(Mods.Mod mod) {
 			Mod            = mod;
-			LocalModAPI    = new Cores.Mods.ModAPI(mod);
-			LocalEventAPI  = new Cores.Events.EventAPI(mod, EventEntryFlags.Main);
-			LocalConfigAPI = new Cores.Configs.ConfigAPI(mod);
-			LocalLoggerAPI = new Cores.Loggers.LoggerAPI(mod);
-			LocalLibAPI    = new Core.Libs.LibAPI(mod);
+			ModAPI    = new Cores.Mods.ModAPI(mod);
+			EventAPI  = new Cores.Events.EventAPI(mod, EventEntryFlags.Main);
+			ConfigAPI = new Cores.Configs.ConfigAPI(mod);
+			LoggerAPI = new Cores.Loggers.LoggerAPI(mod);
+			LibAPI    = new Core.Libs.LibAPI(mod);
 		}
 
 		public IModMetadata ModMetadata
 			=> Mod.Metadata;
 
-		public IChatAPI ChatAPI
-			=> throw new System.NotImplementedException();
+		ILibAPI IModCoreAPI.LibAPI
+			=> LibAPI;
 
-		public EditorLibsAPI LibsAPI
-			=> throw new System.NotImplementedException();
-
-		public ILibAPI LibAPI
-			=> LocalLibAPI;
-
-		public IAssetAPI AssetAPI
+		IAssetAPI IModCoreAPI.AssetAPI
 			=> Mod.AssetAPI;
 
-		public IConfigAPI ConfigAPI
-			=> LocalConfigAPI;
+		IConfigAPI IModCoreAPI.ConfigAPI
+			=> ConfigAPI;
 
-		public ILoggerAPI LoggerAPI
-			=> LocalLoggerAPI;
+		ILoggerAPI IModCoreAPI.LoggerAPI
+			=> LoggerAPI;
 
-		public IModAPI ModAPI
-			=> LocalModAPI;
+		IModAPI IModCoreAPI.ModAPI
+			=> ModAPI;
 
-		public IEventAPI EventAPI
-			=> LocalEventAPI;
+		IEventAPI IModCoreAPI.EventAPI
+			=> EventAPI;
 	}
 }

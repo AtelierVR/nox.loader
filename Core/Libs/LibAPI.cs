@@ -1,7 +1,5 @@
 using System;
 using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices;
 using Nox.CCK.Mods.Libs;
 using Nox.ModLoader.Mods;
 using UnityEngine;
@@ -9,13 +7,14 @@ using UnityEngine;
 namespace Nox.ModLoader.Core.Libs {
 	public class LibAPI : ILibAPI {
 		private readonly Mod _mod;
+		private string MId
+			=> _mod.Metadata.GetId();
 
-		public LibAPI(Mod mod) {
-			_mod = mod;
-		}
+		public LibAPI(Mod mod)
+			=> _mod = mod;
 
-		public string[] GetNativePluginFolders() {
-			var arch        = GetArchSubfolder();
+		public string[] GetFolders() {
+			var arch        = GetArch();
 			var pluginsBase = Path.Combine(Application.dataPath, "Plugins");
 
 			#if UNITY_EDITOR
@@ -44,41 +43,31 @@ namespace Nox.ModLoader.Core.Libs {
 			#endif
 		}
 
-		public string[] GetLibraries() {
-			var ext = GetExtension();
-			return GetNativePluginFolders()
-				.Where(Directory.Exists)
-				.SelectMany(d => Directory.GetFiles(d, "*" + ext))
-				.Select(f => Path.GetFileNameWithoutExtension(f))
-				.Distinct()
-				.ToArray();
-		}
+		public string[] GetLibraries()
+			=> LibManager.GetLibraries(MId);
 
-		public string GetExtension() {
-			if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))     return ".dylib";
-			if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return ".dll";
-			return ".so";
-		}
+		public string GetExtension()
+			=> LibManager.GetExtension();
 
-		public string GetArch() {
-			var arch = GetArchSubfolder();
-			return string.IsNullOrEmpty(arch) ? null : arch;
-		}
+		public string GetArch()
+			=> LibManager.GetArch();
 
-		public string ToPath(string name) {
-			var ext = GetExtension();
-			var filename = name + ext;
-			foreach (var folder in GetNativePluginFolders()) {
-				var path = Path.Combine(folder, filename);
-				if (File.Exists(path)) return path;
-			}
-			return null;
-		}
+		public string ToPath(string name)
+			=> LibManager.ToPath(name, GetFolders());
 
-		private static string GetArchSubfolder() {
-			if (RuntimeInformation.OSArchitecture == Architecture.X64)   return "x86_64";
-			if (RuntimeInformation.OSArchitecture == Architecture.Arm64)  return "ARM64";
-			return string.Empty;
+
+		// ── Delegated to LibManager ──
+
+		public void Load(string name)
+			=> LibManager.Load(name, MId, GetFolders());
+
+		public void Unload(string name)
+			=> LibManager.Unload(name, MId);
+
+		public void Unload() {
+			var libs = LibManager.GetLibraries(MId);
+			foreach (var lib in libs)
+				Unload(lib);
 		}
 	}
 }

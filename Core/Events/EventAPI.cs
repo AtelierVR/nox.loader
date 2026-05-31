@@ -35,11 +35,11 @@ namespace Nox.ModLoader.Cores.Events {
         private void Emit(EventContext context) {
             var ctx = new EventContext(context) { CurrentChannel = _channel, Source = _mod };
             var mod = context.Destination != null ? ModManager.GetMod(context.Destination) : null;
-            if (mod != null) mod.CoreAPI.LocalEventAPI.Receive(ctx);
+            if (mod != null) mod.CoreAPI.EventAPI.Receive(ctx);
             else
                 foreach (var imod in ModManager.GetMods())
                     if (context.Channel.HasFlag(CCK.Mods.Events.EventEntryFlags.Main))
-                        imod.CoreAPI?.LocalEventAPI.Receive(ctx);
+                        imod.CoreAPI?.EventAPI.Receive(ctx);
         }
 
         public void Emit(CCK.Mods.Events.EventContext context)

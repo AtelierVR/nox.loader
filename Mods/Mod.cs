@@ -137,6 +137,9 @@ namespace Nox.ModLoader.Mods {
 
 			// clear all states
 
+			// Unload any native libraries loaded by this mod
+			CoreAPI?.LibAPI?.Unload();
+
 			foreach (var entry in _entryPoints) entry.Dispose();
 
 			_entryPoints = Array.Empty<EntryPoint>();

@@ -244,7 +244,7 @@ namespace Nox.ModLoader.Loader {
 
 			// Send can_load event to all mods
 			foreach (var mod in mods) {
-				mod.CoreAPI.LocalEventAPI.Emit("mod_can_load", mod, new Action<object[]>(Action));
+				mod.CoreAPI.EventAPI.Emit("mod_can_load", mod, new Action<object[]>(Action));
 				continue;
 
 				void Action(object[] obj) {
