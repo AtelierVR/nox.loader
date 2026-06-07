@@ -1,8 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <linker>
-	<assembly fullname="Mono.Cecil" preserve="all" />
-	<assembly fullname="Mono.Cecil.Mdb" preserve="all" />
-	<assembly fullname="Mono.Cecil.Pdb" preserve="all" />
-	<assembly fullname="Mono.Cecil.Rocks" preserve="all" />
 	<assembly fullname="Nox.ModLoader" preserve="all" />
 </linker>
