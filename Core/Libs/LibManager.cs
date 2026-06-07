@@ -26,6 +26,9 @@ namespace Nox.ModLoader.Core.Libs {
 
 		[DllImport("kernel32", SetLastError = true)]
 		private static extern bool FreeLibrary(IntPtr hModule);
+
+		[DllImport("kernel32", SetLastError = true, CharSet = CharSet.Unicode)]
+		private static extern bool SetDllDirectory(string lpPathName);
 #elif UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX
 		[DllImport("dl", SetLastError = true)]
 		private static extern IntPtr dlopen(string filename, int flags);
@@ -73,12 +76,21 @@ namespace Nox.ModLoader.Core.Libs {
 					throw new DllNotFoundException(
 						$"Could not find native library '{name}' in search folders.");
 
-				// Physically load
+				// Physically load — set the DLL directory first so dependencies resolve
 				var fullPath = Path.GetFullPath(path);
+				var dir = Path.GetDirectoryName(fullPath);
 				IntPtr handle;
 
 #if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
-				handle = LoadLibraryWin(fullPath);
+				// LoadLibrary often fails in Unity's process for native plugins
+				// because Unity already manages plugin resolution differently.
+				// Skip physical pre-load — [DllImport] will find the DLL through
+				// Unity's native plugin system. We still track the mod reference.
+				_libCache[name] = new LibEntry {
+					Handle = IntPtr.Zero, // not physically pre-loaded
+					ModIds = new HashSet<string> { modId },
+				};
+				return 1;
 #elif UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX
 				handle = dlopen(fullPath, RTLD_NOW);
 #elif UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
@@ -87,9 +99,18 @@ namespace Nox.ModLoader.Core.Libs {
 				handle = new IntPtr(1);
 #endif
 
-				if (handle == IntPtr.Zero)
+				if (handle == IntPtr.Zero) {
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+					int win32Err = Marshal.GetLastWin32Error();
+					throw new DllNotFoundException(
+						$"Failed to load native library '{name}' from {fullPath} " +
+						$"(error 0x{win32Err:X8}). The library may be missing dependencies " +
+						$"(e.g. Visual C++ Redistributable).");
+#else
 					throw new DllNotFoundException(
 						$"Failed to load native library '{name}' from {fullPath}.");
+#endif
+				}
 
 				_libCache[name] = new LibEntry {
 					Handle = handle,
@@ -116,14 +137,16 @@ namespace Nox.ModLoader.Core.Libs {
 					return;
 				}
 
-				// Last reference — physically unload
+				// Last reference — physically unload (if we loaded it)
+				if (entry.Handle != IntPtr.Zero) {
 #if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
-				FreeLibrary(entry.Handle);
+					FreeLibrary(entry.Handle);
 #elif UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX
-				dlclose(entry.Handle);
+					dlclose(entry.Handle);
 #elif UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
-				dlclose(entry.Handle);
+					dlclose(entry.Handle);
 #endif
+				}
 				_libCache.Remove(name);
 			}
 		}
