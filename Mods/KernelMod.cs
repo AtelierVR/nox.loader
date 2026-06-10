@@ -40,21 +40,20 @@ namespace Nox.ModLoader.Mods {
 			var reference = Metadata.GetReferences()
 				.Where(i => i.IsCompatible());
 
-			// Retrieve all entrypoints to detect corresponding assemblies
-			var namespaces = Metadata.GetEntryPoints().GetAll()
-				.SelectMany(e => e.Value)
-				.Select(e =>
-				{
-					// Extract namespace from entrypoint (e.g. "Nox.Control.Main" -> "Nox.Control")
-					var lastDot = e.LastIndexOf('.');
-					return lastDot > 0 ? e[..lastDot] : e;
-				})
-				.Distinct();
+			// Resolve assemblies: use explicit assembly name from entrypoints when available,
+			// otherwise fall back to namespace-based discovery.
+			var assemblyNames = Metadata.GetEntryPoints().All.Values
+				.SelectMany(e => e)
+				.Select(e => !string.IsNullOrEmpty(e.Assembly) ? e.Assembly : e.Namespace)
+				.Where(n => !string.IsNullOrEmpty(n))
+				.ToHashSet();
 
 			Domain = AppDomain.CurrentDomain;
-			Assemblies = Domain.GetAssemblies()
-				.Where(a => namespaces.Contains(a.GetName().Name))
-				.ToArray();
+			Assemblies = assemblyNames.Count > 0
+				? Domain.GetAssemblies()
+					.Where(a => assemblyNames.Contains(a.GetName().Name))
+					.ToArray()
+				: Array.Empty<Assembly>();
 
 			if (!await AssetAPI.RegisterAssets())
 				return false;

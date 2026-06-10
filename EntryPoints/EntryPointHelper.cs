@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Nox.CCK.Mods.Initializers;
+using Nox.CCK.Mods.Metadata;
 using Nox.CCK.Utils;
 
 namespace Nox.ModLoader.EntryPoints {
@@ -14,8 +15,8 @@ namespace Nox.ModLoader.EntryPoints {
 
 			var instances = new Dictionary<string, T>();
 
-			foreach (var (ns, type) in types) {
-				if (instances.ContainsKey(ns))
+			foreach (var (key, type) in types) {
+				if (instances.ContainsKey(key))
 					continue;
 
 				var instance = (T)Activator.CreateInstance(type, true);
@@ -25,7 +26,7 @@ namespace Nox.ModLoader.EntryPoints {
 					continue;
 				}
 
-				instances.Add(ns, instance);
+				instances.Add(key, instance);
 			}
 
 			return instances.Values.ToArray();
@@ -37,32 +38,54 @@ namespace Nox.ModLoader.EntryPoints {
 			if (!entries.Has(entry.Name))
 				return Array.Empty<(string, Type)>();
 
-			var namespaces = entries.Get(entry.Name);
+			var elements = entries.Get(entry.Name);
 			var t = typeof(T);
+			var assemblies = entry.Mod.GetAssemblies();
 
-			var ts = (from assembly in entry.Mod.GetAssemblies()
-				from type in assembly.GetTypes()
-				from ns in namespaces
-				where type.FullName == ns
-				select (ns, type)).ToList();
-			
-			foreach (var ns in namespaces) {
-				var match = ts.FirstOrDefault(x => x.Item1 == ns);
-				if (match == default) {
-					Logger.LogWarning($"Could not find type {ns} in mod {entry.Mod.Metadata.GetId()}");
+			var results = new List<(string, Type)>();
+
+			foreach (var element in elements) {
+				var fullName = element.FullName;
+				if (string.IsNullOrEmpty(fullName)) continue;
+
+				Type foundType = null;
+
+				// If assembly is explicitly specified, lookup directly by name
+				if (!string.IsNullOrEmpty(element.Assembly)) {
+					var asm = Array.Find(assemblies, a => a.GetName().Name == element.Assembly);
+					if (asm != null) {
+						foundType = asm.GetType(fullName); // O(1) dictionary lookup
+						if (foundType == null)
+							Logger.LogWarning($"Type {fullName} not found in assembly {element.Assembly} for entry point {entry.Name} in mod {entry.Mod.Metadata.GetId()}");
+					} else {
+						Logger.LogWarning($"Assembly {element.Assembly} not found for entry point {entry.Name} in mod {entry.Mod.Metadata.GetId()}");
+					}
+				} else {
+					// Fallback: auto-discover using GetType() (O(1) per assembly)
+					foreach (var asm in assemblies) {
+						foundType = asm.GetType(fullName);
+						if (foundType != null) {
+							// Self-heal: cache the assembly for future lookups
+							element.Assembly = asm.GetName().Name;
+							break;
+						}
+					}
+
+					if (foundType == null)
+						Logger.LogWarning($"Could not find type {fullName} in mod {entry.Mod.Metadata.GetId()}");
+				}
+
+				if (foundType == null) continue;
+
+				if (foundType.GetInterface(t.FullName) == null) {
+					Logger.LogWarning($"Type {fullName} does not implement {t.FullName} in mod {entry.Mod.Metadata.GetId()}");
 					continue;
 				}
-				
-				if (match.type.GetInterface(t.FullName) == null) {
-					Logger.LogWarning($"Type {ns} does not implement {t.FullName} in mod {entry.Mod.Metadata.GetId()}");
-					ts.Remove(match);
-					continue;
-				}
-				
-				// Additional check for parameterless constructor
+
+				results.Add((fullName, foundType));
 			}
 
-			return ts.ToArray();
+			return results.ToArray();
 		}
 	}
 }

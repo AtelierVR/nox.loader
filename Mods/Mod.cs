@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Cysharp.Threading.Tasks;
 using Nox.CCK.Mods;
@@ -107,8 +108,8 @@ namespace Nox.ModLoader.Mods {
 		public virtual UniTask<bool> Load() {
 			CoreAPI.EventAPI.Emit(new ModEventContext("mod_loaded", this));
 
-			var entryPointKeys = Metadata.GetEntryPoints().GetAll().Keys;
-			_entryPoints = new EntryPoint[entryPointKeys.Count];
+			var entryPointKeys = Metadata.GetEntryPoints().All.Keys;
+			_entryPoints = new EntryPoint[entryPointKeys.Count()];
 			var index = 0;
 			foreach (var entry in entryPointKeys) _entryPoints[index++] = new EntryPoint(this, entry);
 

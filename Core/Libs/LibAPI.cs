@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Nox.CCK.Mods.Libs;
 using Nox.ModLoader.Mods;
 using UnityEngine;
@@ -14,31 +16,35 @@ namespace Nox.ModLoader.Core.Libs {
 			=> _mod = mod;
 
 		public string[] GetFolders() {
-			var arch        = GetArch();
-			var pluginsBase = Path.Combine(Application.dataPath, "Plugins");
+			var subFolders = GetSubFolders();
+
+			// Helper: build a Plugins/{sub} list from a root folder (only existing dirs)
+			string[] Build(string root) {
+				return subFolders.Select(s => Path.Combine(root, "Plugins", s))
+					.Append(Path.Combine(root, "Plugins"))
+					.Where(Directory.Exists)
+					.ToArray();
+			}
 
 			#if UNITY_EDITOR
 			// Editor: plugins live next to the mod's asmdef/folder
 			var folder = _mod.GetData<string>("folder");
 			if (!string.IsNullOrEmpty(folder))
-				return string.IsNullOrEmpty(arch)
-					? new[] { Path.Combine(folder, "Plugins") }
-					: new[] { Path.Combine(folder, "Plugins", arch), Path.Combine(folder, "Plugins") };
+				return Build(folder);
+			_mod.CoreAPI.LoggerAPI.LogWarning($"Mod {_mod.Metadata.GetId()} does not have a folder path. Native plugins will not be loaded. This may indicate an issue with the mod's structure or packaging.");
 			return Array.Empty<string>();
 			#else
 			if (_mod is KernelMod) {
-				// Kernel mods ship their native plugins into the game's Plugins/<arch>/ folder
-				return string.IsNullOrEmpty(arch)
-					? new[] { pluginsBase }
-					: new[] { Path.Combine(pluginsBase, arch), pluginsBase };
+				// Kernel mods ship their native plugins into the game's Plugins/<sub>/ folder
+				return Build(Application.dataPath);
 			} else {
 				// External (folder) mods keep plugins next to their bundle
 				var folder = _mod.GetData<string>("folder");
-				if (string.IsNullOrEmpty(folder)) return Array.Empty<string>();
-				var modPlugins = Path.Combine(folder, "Plugins");
-				return string.IsNullOrEmpty(arch)
-					? new[] { modPlugins }
-					: new[] { Path.Combine(modPlugins, arch), modPlugins };
+				if (string.IsNullOrEmpty(folder)) {
+					_mod.CoreAPI.LoggerAPI.LogWarning($"Mod {_mod.Metadata.GetId()} does not have a folder path. Native plugins will not be loaded. This may indicate an issue with the mod's structure or packaging.");
+					return Array.Empty<string>();
+				}
+				return Build(folder);
 			}
 			#endif
 		}
@@ -49,8 +55,8 @@ namespace Nox.ModLoader.Core.Libs {
 		public string GetExtension()
 			=> LibManager.GetExtension();
 
-		public string GetArch()
-			=> LibManager.GetArch();
+		public string[] GetSubFolders()
+			=> LibManager.GetSubFolders();
 
 		public string ToPath(string name)
 			=> LibManager.ToPath(name, GetFolders());

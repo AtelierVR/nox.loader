@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 using Nox.CCK.Mods.Metadata;
+using Nox.CCK.Utils;
 using Nox.ModLoader.Discovers;
 using UnityEngine;
 
@@ -56,7 +57,7 @@ namespace Nox.ModLoader.Typing {
 						? provides.ToObject<string[]>()
 						: Array.Empty<string>(),
 					_version = json.TryGetValue("version", out var version)
-						? new Version(version.Value<string>())
+						? VersionExtensions.From(version.Value<string>())
 						: new Version(),
 					_name = json.TryGetValue("name", out var name)
 						? name.Value<string>()
@@ -348,8 +349,8 @@ namespace Nox.ModLoader.Typing {
 		/// Get the references of the mod.
 		/// </summary>
 		/// <returns></returns>
-		public CCK.Mods.Metadata.Reference[] GetReferences()
-			=> GetInternalReferences().Cast<CCK.Mods.Metadata.Reference>().ToArray();
+		public IReference[] GetReferences()
+			=> GetInternalReferences().Cast<IReference>().ToArray();
 
 		internal Reference[] GetInternalReferences()
 			=> _references;
@@ -412,7 +413,7 @@ namespace Nox.ModLoader.Typing {
 		public bool Match(IRelation relation)
 			=> Match(relation.GetId())
 				&& relation.GetVersion().Matches(GetVersion());
-		
+
 		// Serialization
 
 
@@ -420,14 +421,17 @@ namespace Nox.ModLoader.Typing {
 		/// Convert the metadata to a json string.
 		/// </summary>
 		/// <returns></returns>
-		public string ToJson()
-			=> ToObject().ToString();
+		public string ToJson(ModMetadataFormat format = ModMetadataFormat.None)
+			=> ToObject(format).ToString(
+				(format & ModMetadataFormat.Compact) != 0
+					? Newtonsoft.Json.Formatting.None
+					: Newtonsoft.Json.Formatting.Indented);
 
 		/// <summary>
 		/// Convert the metadata to a json object.
 		/// </summary>
 		/// <returns></returns>
-		public JObject ToObject() {
+		public JObject ToObject(ModMetadataFormat format = ModMetadataFormat.None) {
 			var json = new JObject();
 
 			json["type"]         = GetDataType();
@@ -442,7 +446,11 @@ namespace Nox.ModLoader.Typing {
 			json["authors"]      = new JArray(GetInternalAuthors().Select(a => a.ToJson()));
 			json["contributors"] = new JArray(GetInternalContributors().Select(c => c.ToJson()));
 			json["relations"]    = new JArray(GetInternalRelations().Select(r => r.ToJson()));
-			json["entrypoints"]  = new JObject(GetInternalEntryPoints().ToJson());
+			json["entrypoints"]  = GetInternalEntryPoints().ToJson(
+				(format & ModMetadataFormat.EntryPointObject) != 0
+					? EntryPointFormat.EntryPointObject
+					: EntryPointFormat.None
+			);
 			json["references"]   = new JArray(GetInternalReferences().Select(r => r.ToJson()));
 			json["permissions"]  = new JArray(GetPermissions().Select(p => p));
 
@@ -466,15 +474,14 @@ namespace Nox.ModLoader.Typing {
 				_customs.Add(key, JToken.FromObject(value));
 		}
 
-		public bool Save(string path) {
+		public bool Save(string path, ModMetadataFormat format = ModMetadataFormat.None) {
 			try {
-				System.IO.File.WriteAllText(path, ToJson());
+				System.IO.File.WriteAllText(path, ToJson(format));
 				return true;
 			} catch (Exception e) {
 				CCK.Utils.Logger.LogError("Failed to save mod metadata to json");
 				CCK.Utils.Logger.LogError(e);
 			}
-
 			return false;
 		}
 		#endif

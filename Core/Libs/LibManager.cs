@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
+using Nox.CCK.Utils;
 
 namespace Nox.ModLoader.Core.Libs {
 	/// <summary>
@@ -165,31 +167,25 @@ namespace Nox.ModLoader.Core.Libs {
 
 		internal static object Lock => _lock;
 
-		public static string GetArch() {
-			if (RuntimeInformation.OSArchitecture == Architecture.X64)
-				return "x86_64";
-			if (RuntimeInformation.OSArchitecture == Architecture.Arm64)
-				return "ARM64";
-			return null;
-		}
+		/// <summary>
+		/// Returns the prioritized list of compatible plugin subfolder names for the current
+		/// platform and CPU architecture (delegates to <see cref="Library.CurrentSubFolders"/>).
+		/// </summary>
+		public static string[] GetSubFolders()
+			=> Library.CurrentSubFolders;
 
 		/// <summary>Public extension accessor (mirrors ILibAPI.GetExtension).</summary>
-		public static string GetExtension() {
-			if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-				return ".dylib";
-			if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-				return ".dll";
-			return ".so";
-		}
+		public static string GetExtension()
+			=> Library.CurrentLibraryExtension;
 
 		/// <summary>Global fallback plugin folders (shared across all mods).</summary>
 		public static string[] GetGlobalPluginFolders() {
-			var arch = GetArch();
 			var pluginsBase = Path.Combine(
 				UnityEngine.Application.dataPath, "Plugins");
-			return string.IsNullOrEmpty(arch)
-				? new[] { pluginsBase }
-				: new[] { Path.Combine(pluginsBase, arch), pluginsBase };
+			return GetSubFolders().Select(s => Path.Combine(pluginsBase, s))
+				.Append(pluginsBase)
+				.Where(Directory.Exists)
+				.ToArray();
 		}
 
 		/// <summary>
