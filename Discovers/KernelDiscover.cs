@@ -28,7 +28,14 @@ namespace Nox.ModLoader.Discovers {
 
 			var files = Directory.GetFiles(Application.dataPath, "*.asmdef", SearchOption.AllDirectories);
 			#if UNITY_EDITOR
-			files = files.Concat(Directory.GetFiles(Path.Combine(Application.dataPath, "..", "Packages"), "*.asmdef", SearchOption.AllDirectories)).ToArray();
+			// Packages/ — local file: packages
+			var packagesDir = Path.Combine(Application.dataPath, "..", "Packages");
+			if (Directory.Exists(packagesDir))
+				files = files.Concat(Directory.GetFiles(packagesDir, "*.asmdef", SearchOption.AllDirectories)).ToArray();
+			// Library/PackageCache/ — git/upm packages resolved from manifest.json
+			var cacheDir = Path.Combine(Application.dataPath, "..", "Library", "PackageCache");
+			if (Directory.Exists(cacheDir))
+				files = files.Concat(Directory.GetFiles(cacheDir, "*.asmdef", SearchOption.AllDirectories)).ToArray();
 			#endif
 
 
