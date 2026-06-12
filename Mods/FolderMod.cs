@@ -67,7 +67,7 @@ namespace Nox.ModLoader.Mods {
 			foreach (var loader in _assemblyLoaders) {
 				if (loader is not MonoAssemblyLoader { IsLoaded: true } monoLoader) continue;
 				var types = monoLoader.GetTypes();
-				if (types.Length <= 0) continue;
+				if (types.Length == 0) continue;
 				var assembly = types[0].Assembly;
 				if (!assemblies.Contains(assembly))
 					assemblies.Add(assembly);
@@ -99,13 +99,13 @@ namespace Nox.ModLoader.Mods {
 				// Create isolated AssemblyLoadContext for this mod
 				_context = new ModAssemblyLoadContext(Metadata.GetId(), folderPath);
 				Logger.LogDebug($"Created isolated AssemblyLoadContext for mod {Metadata.GetId()}");
-				
+
 				_permissionContext = new ModPermissionContext(
 					Metadata.GetId(),
 					Metadata.GetPermissions(),
 					isKernel: false // FolderMods are NEVER kernel mods
 				);
-				
+
 				Logger.LogDebug($"[Permissions] {_permissionContext.GetSummary()}");
 				#endif
 
