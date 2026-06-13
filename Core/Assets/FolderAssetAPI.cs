@@ -38,7 +38,7 @@ namespace Nox.ModLoader.Cores.Assets {
             if (string.IsNullOrEmpty(folderPath)) return _isLoaded = true;
 
             try {
-                var assetsPath = Path.Combine(folderPath, "assets");
+                var assetsPath = Path.Combine(folderPath, "Assets");
                 if (Directory.Exists(assetsPath)) {
                     // Load all asset bundles from the assets folder
                     var bundles = Directory.GetFiles(assetsPath, "*.bundle");

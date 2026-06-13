@@ -55,7 +55,7 @@ namespace Nox.ModLoader.Discovers {
 					noxobj.InternalData["folder"]     = Path.GetDirectoryName(file);
 					noxobj.InternalData["definition"] = file;
 					noxobj.InternalData["manifest"]   = noxmod;
-					noxobj.InternalData["assets"]     = Path.Combine(Path.GetDirectoryName(file) ?? string.Empty, "assets");
+					noxobj.InternalData["assets"]     = Path.Combine(Path.GetDirectoryName(file) ?? string.Empty, "Assets");
 					noxobj.InternalDDiscover          = this;
 					packages.Add(noxobj);
 				} catch (Exception e) {
