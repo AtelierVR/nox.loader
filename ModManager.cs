@@ -36,8 +36,8 @@ namespace Nox.ModLoader {
 			Logger.LogDebug("[ModManager] Permission registry initialized");
 		}
 
-		public static Mod[] GetMods()
-			=> Mods?.ToArray() ?? Array.Empty<Mod>();
+		public static IReadOnlyList<Mod> GetMods()
+			=> Mods ?? (IReadOnlyList<Mod>)Array.Empty<Mod>();
 
 		public static Mod GetMod(string id)
 			=> Mods?.Find(x => x.GetMetadata().Match(id));
@@ -56,15 +56,14 @@ namespace Nox.ModLoader {
 
 		public static async UniTask<ResultLoadInfos> LoadMods(IDiscover discover) {
 			EnsureInitialized();
-			
-			var mods     = new List<Mod>();
-			var packages = discover.FindAllPackages();
 
-			foreach (var package in packages) {
+			var mods = new List<Mod>();
+
+			foreach (var package in discover.FindAllPackages()) {
 				mods.Add(package.InternalDDiscover.CreateMod(package));
 				Logger.LogDebug($"{package.GetId()}@{package.GetVersion()} found by discover {discover.GetType().Name}", tag: nameof(ModManager));
 			}
-			
+
 			return await PrepareMods(mods.ToArray());
 		}
 
