@@ -63,9 +63,10 @@ namespace Nox.ModLoader.Cores.Assets {
 
                 foreach (var bundle in _assetBundles) {
                     if (!bundle.Contains(bundlePath)) continue;
-                    var raw = bundle.LoadAsset<Object>(bundlePath);
-                    if (raw is SymbolicAsset symbolic) return HasAsset<T>(symbolic.Target);
-                    return raw is T;
+                    if (bundle.LoadAsset<T>(bundlePath)) return true;
+                    if (bundle.LoadAsset<SymbolicAsset>(bundlePath) is { } symbolic)
+                        return HasAsset<T>(symbolic.Target);
+                    return false;
                 }
             }
 
@@ -83,9 +84,10 @@ namespace Nox.ModLoader.Cores.Assets {
 
                 foreach (var bundle in _assetBundles) {
                     if (!bundle.Contains(bundlePath)) continue;
-                    var raw = bundle.LoadAsset<Object>(bundlePath);
-                    if (raw is SymbolicAsset symbolic) return GetAsset<T>(symbolic.Target);
-                    return raw as T;
+                    if (bundle.LoadAsset<T>(bundlePath) is { } asset) return asset;
+                    if (bundle.LoadAsset<SymbolicAsset>(bundlePath) is { } symbolic)
+                        return GetAsset<T>(symbolic.Target);
+                    return default;
                 }
             }
 
@@ -150,9 +152,10 @@ namespace Nox.ModLoader.Cores.Assets {
 
                 foreach (var bundle in _assetBundles) {
                     if (!bundle.Contains(bundlePath)) continue;
-                    var raw = bundle.LoadAsset<Object>(bundlePath);
-                    if (raw is SymbolicAsset symbolic) return await GetAssetAsync<T>(symbolic.Target);
-                    return raw as T;
+                    if (bundle.LoadAsset<T>(bundlePath) is { } asset) return asset;
+                    if (bundle.LoadAsset<SymbolicAsset>(bundlePath) is { } symbolic)
+                        return await GetAssetAsync<T>(symbolic.Target);
+                    return default;
                 }
             }
 
