@@ -32,11 +32,11 @@ namespace Nox.ModLoader.Core.Libs {
 		[DllImport("kernel32", SetLastError = true, CharSet = CharSet.Unicode)]
 		private static extern bool SetDllDirectory(string lpPathName);
 #elif UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX
-		[DllImport("dl", SetLastError = true)]
+		[DllImport("libdl.so.2", SetLastError = true)]
 		private static extern IntPtr dlopen(string filename, int flags);
 		private const int RTLD_NOW = 2;
 
-		[DllImport("dl", SetLastError = true)]
+		[DllImport("libdl.so.2", SetLastError = true)]
 		private static extern int dlclose(IntPtr handle);
 #elif UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
 		[DllImport("libdl", SetLastError = true)]
