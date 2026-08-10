@@ -35,7 +35,11 @@ namespace Nox.ModLoader.Discovers {
 			// Library/PackageCache/ — git/upm packages resolved from manifest.json
 			var cacheDir = Path.Combine(Application.dataPath, "..", "Library", "PackageCache");
 			if (Directory.Exists(cacheDir))
-				files = files.Concat(Directory.GetFiles(cacheDir, "*.asmdef", SearchOption.AllDirectories)).ToArray();
+				try {
+					files = files.Concat(Directory.GetFiles(cacheDir, "*.asmdef", SearchOption.AllDirectories)).ToArray();
+				} catch (DirectoryNotFoundException e) {
+					Logger.LogWarning($"Skipping inaccessible PackageCache directory: {e.Message}");
+				}
 			#endif
 
 
