@@ -29,14 +29,15 @@ namespace Nox.ModLoader.Loader {
 				return;
 			}
 
-			Logger.ShowProgress(nameof(LoaderManager), "Enabling mod entries...", -1.0f);
+			Logger.ShowProgress(nameof(LoaderManager), "Enabling mod entries...", -1.0f, background: true);
 
 			for (var i = 0; i < mods.Count; i++) {
 				var mod = mods[i];
 				Logger.ShowProgress(
 					nameof(LoaderManager),
 					$"Enabling {mod.Metadata.GetId()}@{mod.Metadata.GetVersion()}...",
-					(float)(i + 1) / mods.Count
+					(float)(i + 1) / mods.Count,
+					background: true
 				);
 
 				foreach (var entry in entries)
@@ -58,14 +59,15 @@ namespace Nox.ModLoader.Loader {
 				return;
 			}
 
-			Logger.ShowProgress(nameof(LoaderManager), "Disabling mod entries...", -1.0f);
+			Logger.ShowProgress(nameof(LoaderManager), "Disabling mod entries...", -1.0f, background: true);
 
 			for (var i = 0; i < mods.Count; i++) {
 				var mod = mods[i];
 				Logger.ShowProgress(
 					nameof(LoaderManager),
 					$"Disabling {mod.Metadata.GetId()}@{mod.Metadata.GetVersion()}...",
-					(float)(i + 1) / mods.Count
+					(float)(i + 1) / mods.Count,
+					background: true
 				);
 
 				foreach (var entry in entries)
@@ -100,26 +102,28 @@ namespace Nox.ModLoader.Loader {
 				return;
 			}
 
-			Logger.ShowProgress(nameof(LoaderManager), "Initializing Mods...", 0f);
+			Logger.ShowProgress(nameof(LoaderManager), "Initializing Mods...", 0f, background: true);
 			for (var i = 0; i < mods.Count; i++) {
 				var mod = mods[i];
 				Logger.ShowProgress(
 					nameof(LoaderManager),
 					$"Initializing {mod.Metadata.GetId()}@{mod.Metadata.GetVersion()}...",
-					(float)(i + 1) / mods.Count / 2
+					(float)(i + 1) / mods.Count / 2,
+					background: true
 				);
 
 				await mod.Initialize();
 				await UniTask.SwitchToMainThread();
 			}
 
-			Logger.ShowProgress(nameof(LoaderManager), "Post-Initializing Mods...", 0.5f);
+			Logger.ShowProgress(nameof(LoaderManager), "Post-Initializing Mods...", 0.5f, background: true);
 			for (var i = 0; i < mods.Count; i++) {
 				var mod = mods[i];
 				Logger.ShowProgress(
 					nameof(LoaderManager),
 					$"Post-Initializing {mod.Metadata.GetId()}@{mod.Metadata.GetVersion()}...",
-					0.5f + ((float)(i + 1) / mods.Count / 2)
+					0.5f + ((float)(i + 1) / mods.Count / 2),
+					background: true
                 );
 
 				await mod.PostInitialize();
@@ -137,26 +141,28 @@ namespace Nox.ModLoader.Loader {
 			}
 
 			// Dispose in reverse initialization order so dependants are disposed before their dependencies
-			Logger.ShowProgress(nameof(LoaderManager), "Pre-Disposing Mods...", 0f);
+			Logger.ShowProgress(nameof(LoaderManager), "Pre-Disposing Mods...", 0f, background: true);
 			for (var i = mods.Count - 1; i >= 0; i--) {
 				var mod = mods[i];
 				Logger.ShowProgress(
 					nameof(LoaderManager),
 					$"Pre-Disposing {mod.Metadata.GetId()}@{mod.Metadata.GetVersion()}...",
-					(float)(mods.Count - i) / mods.Count / 2
+					(float)(mods.Count - i) / mods.Count / 2,
+					background: true
 				);
 
 				await mod.PreDispose();
 				await UniTask.SwitchToMainThread();
 			}
 
-			Logger.ShowProgress(nameof(LoaderManager), "Disposing Mods...", 0.5f);
+			Logger.ShowProgress(nameof(LoaderManager), "Disposing Mods...", 0.5f, background: true);
 			for (var i = mods.Count - 1; i >= 0; i--) {
 				var mod = mods[i];
 				Logger.ShowProgress(
 					nameof(LoaderManager),
 					$"Disposing {mod.Metadata.GetId()}@{mod.Metadata.GetVersion()}...",
-					0.5f + ((float)(mods.Count - i) / mods.Count / 2)
+					0.5f + ((float)(mods.Count - i) / mods.Count / 2),
+					background: true
                 );
 
 				await mod.Dispose();
@@ -167,7 +173,7 @@ namespace Nox.ModLoader.Loader {
 		}
 
 		public static async UniTask Discover() {
-			Logger.ShowProgress(nameof(LoaderManager), "Discovering Mods...", -1.0f);
+			Logger.ShowProgress(nameof(LoaderManager), "Discovering Mods...", -1.0f, background: true);
 
 			var loaded = await ModManager.LoadMods();
 
