@@ -70,6 +70,16 @@ namespace Nox.ModLoader.Core.Libs {
 		public void Unload(string name)
 			=> LibManager.Unload(name, MId);
 
+		public IntPtr GetHandle(string name)
+			=> LibManager.GetHandle(name, MId);
+
+		public IntPtr GetSymbol(string name, string symbol)
+			=> LibManager.GetSymbol(name, symbol, MId);
+
+		public T GetDelegate<T>(string name, string symbol)
+			where T : Delegate
+			=> LibManager.GetDelegate<T>(name, symbol, MId);
+
 		public void Unload() {
 			var libs = LibManager.GetLibraries(MId);
 			foreach (var lib in libs)

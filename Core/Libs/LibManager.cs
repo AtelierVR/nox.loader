@@ -23,14 +23,11 @@ namespace Nox.ModLoader.Core.Libs {
 		private static readonly object _lock = new();
 
 #if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
-		[DllImport("kernel32", SetLastError = true, EntryPoint = "LoadLibraryW")]
-		private static extern IntPtr LoadLibraryWin(string lpFileName);
-
-		[DllImport("kernel32", SetLastError = true)]
-		private static extern bool FreeLibrary(IntPtr hModule);
+		[DllImport("kernel32", SetLastError = true, CharSet = CharSet.Ansi)]
+		private static extern IntPtr GetProcAddress(IntPtr hModule, string lpProcName);
 
 		[DllImport("kernel32", SetLastError = true, CharSet = CharSet.Unicode)]
-		private static extern bool SetDllDirectory(string lpPathName);
+		private static extern IntPtr GetModuleHandle(string lpModuleName);
 #elif UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX
 		[DllImport("libdl.so.2", SetLastError = true)]
 		private static extern IntPtr dlopen(string filename, int flags);
@@ -38,6 +35,9 @@ namespace Nox.ModLoader.Core.Libs {
 
 		[DllImport("libdl.so.2", SetLastError = true)]
 		private static extern int dlclose(IntPtr handle);
+
+		[DllImport("libdl.so.2", SetLastError = true)]
+		private static extern IntPtr dlsym(IntPtr handle, string symbol);
 #elif UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
 		[DllImport("libdl", SetLastError = true)]
 		private static extern IntPtr dlopen(string filename, int flags);
@@ -45,6 +45,9 @@ namespace Nox.ModLoader.Core.Libs {
 
 		[DllImport("libdl", SetLastError = true)]
 		private static extern int dlclose(IntPtr handle);
+
+		[DllImport("libdl", SetLastError = true)]
+		private static extern IntPtr dlsym(IntPtr handle, string symbol);
 #endif
 
 		/// <summary>
@@ -84,12 +87,14 @@ namespace Nox.ModLoader.Core.Libs {
 				IntPtr handle;
 
 #if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
-				// LoadLibrary often fails in Unity's process for native plugins
-				// because Unity already manages plugin resolution differently.
-				// Skip physical pre-load — [DllImport] will find the DLL through
-				// Unity's native plugin system. We still track the mod reference.
+				// Unity already manages native plugin resolution (see the .meta PluginImporter
+				// platform settings). Manually calling LoadLibrary here can fail with error 0x7E
+				// (ERROR_MOD_NOT_FOUND) when the library has sibling dependencies that Unity would
+				// otherwise resolve. We therefore do NOT physically pre-load on Windows; instead we
+				// record the mod reference and lazily resolve the module handle (already loaded by
+				// Unity) in GetHandle/GetSymbol via GetModuleHandle.
 				_libCache[name] = new LibEntry {
-					Handle = IntPtr.Zero, // not physically pre-loaded
+					Handle = IntPtr.Zero, // resolved lazily via GetModuleHandle
 					ModIds = new HashSet<string> { modId },
 				};
 				return 1;
@@ -139,10 +144,12 @@ namespace Nox.ModLoader.Core.Libs {
 					return;
 				}
 
-				// Last reference — physically unload (if we loaded it)
+				// Last reference — physically unload (if we loaded it).
+				// On Windows the native plugin is managed by Unity's plugin system, so we must
+				// NOT FreeLibrary it (and GetModuleHandle handles cannot be freed anyway).
 				if (entry.Handle != IntPtr.Zero) {
 #if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
-					FreeLibrary(entry.Handle);
+					// Intentionally no-op on Windows — Unity owns the native plugin lifecycle.
 #elif UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX
 					dlclose(entry.Handle);
 #elif UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
@@ -151,6 +158,80 @@ namespace Nox.ModLoader.Core.Libs {
 				}
 				_libCache.Remove(name);
 			}
+		}
+
+		/// <summary>
+		/// Checks that <paramref name="modId"/> has previously loaded <paramref name="name"/>
+		/// (whitelist) and returns its cached <c>LibEntry</c>. Throws if not whitelisted.
+		/// </summary>
+		private static LibEntry RequireLoaded(string name, string modId)
+		{
+			if (!_libCache.TryGetValue(name, out var entry) || !entry.ModIds.Contains(modId))
+				throw new InvalidOperationException(
+					$"Mod '{modId}' has not loaded native library '{name}'. " +
+					"Call Load(name) before resolving handles/symbols (whitelist).");
+			return entry;
+		}
+
+		/// <summary>
+		/// Returns the native module handle for <paramref name="name"/> if (and only if)
+		/// <paramref name="modId"/> previously loaded it. On Windows the module is assumed to be
+		/// loaded by Unity's native plugin system, so the handle is resolved lazily via
+		/// <c>GetModuleHandle</c> rather than a manual LoadLibrary.
+		/// </summary>
+		public static IntPtr GetHandle(string name, string modId)
+		{
+			lock (_lock)
+			{
+				var entry = RequireLoaded(name, modId);
+
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+				// Cache the resolved module handle (GetModuleHandle is cheap but repeated calls
+				// across every symbol resolution are wasteful).
+				if (entry.Handle == IntPtr.Zero)
+				{
+					var moduleName = name + GetExtension();
+					entry.Handle = GetModuleHandle(moduleName);
+					_libCache[name] = entry;
+				}
+#endif
+				return entry.Handle;
+			}
+		}
+
+		/// <summary>
+		/// Resolves the address of the native export <paramref name="symbol"/> from a library
+		/// that <paramref name="modId"/> has previously loaded (whitelist).
+		/// </summary>
+		public static IntPtr GetSymbol(string name, string symbol, string modId)
+		{
+			var handle = GetHandle(name, modId);
+			if (handle == IntPtr.Zero)
+				return IntPtr.Zero;
+
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+			return GetProcAddress(handle, symbol);
+#elif UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX
+			return dlsym(handle, symbol);
+#elif UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
+			return dlsym(handle, symbol);
+#else
+			return IntPtr.Zero;
+#endif
+		}
+
+		/// <summary>
+		/// Resolves and wraps a native export as a managed delegate (DllImport-free). The library
+		/// must have been previously loaded by <paramref name="modId"/> (whitelist).
+		/// </summary>
+		public static T GetDelegate<T>(string name, string symbol, string modId)
+			where T : Delegate
+		{
+			var ptr = GetSymbol(name, symbol, modId);
+			if (ptr == IntPtr.Zero)
+				throw new EntryPointNotFoundException(
+					$"Could not find the entrypoint '{symbol}' in native library '{name}'.");
+			return Marshal.GetDelegateForFunctionPointer<T>(ptr);
 		}
 
 		/// <summary>
