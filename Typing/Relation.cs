@@ -8,6 +8,7 @@ namespace Nox.ModLoader.Typing
     public class Relation : IRelation
     {
         private string _id;
+        private string _register;
         private RelationType _relationType;
         private VersionMatching _version;
 
@@ -32,7 +33,8 @@ namespace Nox.ModLoader.Typing
                 {
                     _id = obj.Value<string>("id"),
                     _relationType = obj.TryGetValue("type", out var type) ? RelationExtensions.GetRelationTypeFromName(type.Value<string>()) : RelationType.Depends,
-                    _version = obj.TryGetValue("version", out var version) ? new VersionMatching(version.Value<string>()) : new VersionMatching(">=0.0.0")
+                    _version = obj.TryGetValue("version", out var version) ? new VersionMatching(version.Value<string>()) : new VersionMatching(">=0.0.0"),
+                    _register = obj.TryGetValue("register", out var register) ? register.Value<string>() : null
                 };
             }
             return null;
@@ -56,6 +58,11 @@ namespace Nox.ModLoader.Typing
         /// <returns></returns>
         public VersionMatching GetVersion() => _version;
 
+        /// <summary>
+        /// Get the register (source URL / UPM reference) of the relation, if any.
+        /// </summary>
+        public string GetRegister() => _register;
+
         public JObject ToJson()
         {
             var obj = new JObject
@@ -64,6 +71,8 @@ namespace Nox.ModLoader.Typing
                 {"type", RelationExtensions.GetRelationTypeFromEnum(_relationType)},
                 {"version", _version.ToString()}
             };
+            if (!string.IsNullOrEmpty(_register))
+                obj["register"] = _register;
             return obj;
         }
     }
