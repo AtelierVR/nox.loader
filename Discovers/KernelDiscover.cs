@@ -24,46 +24,21 @@ namespace Nox.ModLoader.Discovers {
 			#if UNITY_EDITOR
 			List<ModMetadata> packages = new();
 
-			Logger.LogDebug("Finding kernel mods with Assembly Definitions...");
+			Logger.LogDebug("Finding kernel mods with Mod Metadata...");
 
-			var files = Directory.GetFiles(Application.dataPath, "*.asmdef", SearchOption.AllDirectories);
-			#if UNITY_EDITOR
-			// Packages/ — local file: packages
-			var packagesDir = Path.Combine(Application.dataPath, "..", "Packages");
-			if (Directory.Exists(packagesDir))
-				files = files.Concat(Directory.GetFiles(packagesDir, "*.asmdef", SearchOption.AllDirectories)).ToArray();
-			// Library/PackageCache/ — git/upm packages resolved from manifest.json
-			var cacheDir = Path.Combine(Application.dataPath, "..", "Library", "PackageCache");
-			if (Directory.Exists(cacheDir))
+			foreach (var noxmod in EnumerateModManifests()) {
 				try {
-					files = files.Concat(Directory.GetFiles(cacheDir, "*.asmdef", SearchOption.AllDirectories)).ToArray();
-				} catch (DirectoryNotFoundException e) {
-					Logger.LogWarning($"Skipping inaccessible PackageCache directory: {e.Message}");
-				}
-			#endif
-
-
-			foreach (var file in files) {
-				try {
-					var obj = JObject.Parse(File.ReadAllText(file));
-					if (!obj.TryGetValue("name", out _))
-						continue;
-					var noxmod = Directory
-						.GetFiles(Path.GetDirectoryName(file) ?? string.Empty, "nox.mod.json*", SearchOption.TopDirectoryOnly)
-						.FirstOrDefault();
-					if (noxmod == null)
-						continue;
 					var noxobj = ModMetadata.LoadFromPath(noxmod);
 					if (noxobj == null)
 						continue;
-					noxobj.InternalData["folder"]     = Path.GetDirectoryName(file);
-					noxobj.InternalData["definition"] = file;
-					noxobj.InternalData["manifest"]   = noxmod;
-					noxobj.InternalData["assets"]     = Path.Combine(Path.GetDirectoryName(file) ?? string.Empty, "Assets");
-					noxobj.InternalDDiscover          = this;
+					var folder                     = Path.GetDirectoryName(noxmod) ?? string.Empty;
+					noxobj.InternalData["folder"]   = folder;
+					noxobj.InternalData["manifest"] = noxmod;
+					noxobj.InternalData["assets"]   = Path.Combine(folder, "Assets");
+					noxobj.InternalDDiscover        = this;
 					packages.Add(noxobj);
 				} catch (Exception e) {
-					Logger.LogError(new Exception($"Error loading mod metadata from {file}", e));
+					Logger.LogError(new Exception($"Error loading mod metadata from {noxmod}", e));
 					continue;
 				}
 			}
@@ -113,22 +88,46 @@ namespace Nox.ModLoader.Discovers {
 			#endif
 		}
 
+		/// <summary>
+		/// Enumerate every <c>nox.mod.json</c> manifest in the project (Assets and Packages).
+		/// </summary>
+		private IEnumerable<string> EnumerateModManifests() {
+			var modFiles = new List<string>();
+			modFiles.AddRange(Directory.GetFiles(Application.dataPath, "nox.mod.json", SearchOption.AllDirectories));
+			#if UNITY_EDITOR
+			// Packages/ — local file: packages
+			var packagesDir = Path.Combine(Application.dataPath, "..", "Packages");
+			if (Directory.Exists(packagesDir))
+				modFiles.AddRange(Directory.GetFiles(packagesDir, "nox.mod.json", SearchOption.AllDirectories));
+			// Library/PackageCache/ — git/upm packages resolved from manifest.json
+			var cacheDir = Path.Combine(Application.dataPath, "..", "Library", "PackageCache");
+			if (Directory.Exists(cacheDir))
+				try {
+					modFiles.AddRange(Directory.GetFiles(cacheDir, "nox.mod.json", SearchOption.AllDirectories));
+				} catch (DirectoryNotFoundException e) {
+					Logger.LogWarning($"Skipping inaccessible PackageCache directory: {e.Message}");
+				}
+			#endif
+			return modFiles;
+		}
+
 		public ModMetadata FindPackage(string id) {
-			var asmdef = Directory.GetFiles(Application.dataPath, id + ".asmdef", SearchOption.AllDirectories)
-				.FirstOrDefault();
-			if (asmdef == null)
-				return null;
-			var noxmod = Directory
-				.GetFiles(Path.GetDirectoryName(asmdef) ?? string.Empty, "nox.mod.json*", SearchOption.TopDirectoryOnly)
-				.FirstOrDefault();
-			if (noxmod == null)
-				return null;
-			var noxobj = ModMetadata.LoadFromPath(noxmod);
-			if (noxobj == null)
-				return null;
-			noxobj.InternalData["folder"] = Path.GetDirectoryName(asmdef);
-			noxobj.InternalDDiscover      = this;
-			return noxobj;
+			foreach (var noxmod in EnumerateModManifests()) {
+				try {
+					var noxobj = ModMetadata.LoadFromPath(noxmod);
+					if (noxobj == null)
+						continue;
+					if (noxobj.GetId() != id && !(noxobj.GetProvides()?.Contains(id) ?? false))
+						continue;
+					var folder                     = Path.GetDirectoryName(noxmod) ?? string.Empty;
+					noxobj.InternalData["folder"] = folder;
+					noxobj.InternalDDiscover      = this;
+					return noxobj;
+				} catch {
+					// Ignore malformed manifests.
+				}
+			}
+			return null;
 		}
 
 		public Mod CreateMod(ModMetadata metadata)
