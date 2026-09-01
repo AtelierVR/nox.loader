@@ -1,6 +1,7 @@
 {
   "type": "library",
   "id": "nox.loader",
+  "version": "1.0.x",
   "relations": [
     { "id": "com.cysharp.unitask", "type": "depends", "register": "git+https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask" },
     { "id": "com.unity.nuget.mono-cecil", "type": "depends", "register": "upm:1.11.4" },
