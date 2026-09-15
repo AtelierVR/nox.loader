@@ -49,6 +49,22 @@ namespace Nox.ModLoader.Loader {
 			Destroy(gameObject);
 		}
 
+		private void OnEnable()
+			=> Application.quitting += OnApplicationQuitting;
+
+		private void OnDisable()
+			=> Application.quitting -= OnApplicationQuitting;
+
+		/// <summary>
+		/// À la fermeture de l'application, on démonte les mods synchroniquement : c'est le
+		/// dernier moment où leurs <c>OnDispose*</c> synchromes peuvent libérer sockets, threads
+		/// et handles avant que le processus ne se termine.
+		/// </summary>
+		private static void OnApplicationQuitting() {
+			Logger.LogDebug("Application is quitting: disposing mods synchronously...", tag: nameof(RuntimeLoader));
+			LoaderManager.DisposeSync("application quit");
+		}
+
 		private void Start()
 			=> StartAsync().Forget();
 

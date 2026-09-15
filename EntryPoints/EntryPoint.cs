@@ -3,6 +3,7 @@ using System.Data;
 using System.Linq;
 using Cysharp.Threading.Tasks;
 using Nox.CCK.Mods.Initializers;
+using Nox.ModLoader.Loader;
 using Nox.ModLoader.Mods;
 
 namespace Nox.ModLoader.EntryPoints {
@@ -289,6 +290,93 @@ namespace Nox.ModLoader.EntryPoints {
 
 			profiler.Set("dispose", Name, Profiler.At.End, DateTime.UtcNow);
 		}
+
+		/// <summary>
+		/// Variante <b>synchrone</b> de <see cref="OnPreDispose"/> : les callbacks synchrones des
+		/// initializers sont invoqués, puis leurs variantes asynchrones attendues de façon bornée
+		/// (voir <see cref="LoaderManager.WaitSync"/>).
+		/// <para>
+		/// À utiliser avant un reload de domaine : les continuations UniTask pompées par la player
+		/// loop ne tourneront plus. Les variantes <c>*Async</c> sont donc appelées directement et
+		/// attendues, sans garantir qu'elles aillent au bout.
+		/// </para>
+		/// </summary>
+		public void OnPreDisposeSync() {
+			// Même garde que la version async : il faut que l'entrée soit désactivée.
+			if (IsEnabled() || _state != InitializerState.PostInitialized)
+				return;
+			_state = InitializerState.PreDisposed;
+
+			for (var i = 0; i < _instances.Length; i++) {
+				var instance = _instances[i].Reference;
+				try {
+					if (instance is IClientModInitializer c) {
+						c.OnPreDisposeClient();
+						WaitSync(c.OnPreDisposeClientAsync(), nameof(c.OnPreDisposeClientAsync));
+					}
+					if (instance is IServerModInitializer s) {
+						s.OnPreDisposeServer();
+						WaitSync(s.OnPreDisposeServerAsync(), nameof(s.OnPreDisposeServerAsync));
+					}
+					if (instance is IEditorModInitializer e) {
+						e.OnPreDisposeEditor();
+						WaitSync(e.OnPreDisposeEditorAsync(), nameof(e.OnPreDisposeEditorAsync));
+					}
+					if (instance is IMainModInitializer m) {
+						m.OnPreDisposeMain();
+						WaitSync(m.OnPreDisposeMainAsync(), nameof(m.OnPreDisposeMainAsync));
+					}
+
+					instance.OnPreDispose();
+					WaitSync(instance.OnPreDisposeAsync(), nameof(instance.OnPreDisposeAsync));
+				} catch (Exception e) {
+					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to pre-dispose mod {Mod.Metadata.GetId()}@{Mod.Metadata.GetVersion()}", e));
+				}
+			}
+		}
+
+		/// <summary>
+		/// Variante <b>synchrone</b> de <see cref="OnDispose"/>. Voir <see cref="OnPreDisposeSync"/>.
+		/// </summary>
+		public void OnDisposeSync() {
+			if (IsEnabled() || _state != InitializerState.PreDisposed)
+				return;
+			_state = InitializerState.Disposed;
+
+			for (var i = 0; i < _instances.Length; i++) {
+				var instance = _instances[i].Reference;
+				try {
+					if (instance is IClientModInitializer c) {
+						c.OnDisposeClient();
+						WaitSync(c.OnDisposeClientAsync(), nameof(c.OnDisposeClientAsync));
+					}
+					if (instance is IServerModInitializer s) {
+						s.OnDisposeServer();
+						WaitSync(s.OnDisposeServerAsync(), nameof(s.OnDisposeServerAsync));
+					}
+					if (instance is IEditorModInitializer e) {
+						e.OnDisposeEditor();
+						WaitSync(e.OnDisposeEditorAsync(), nameof(e.OnDisposeEditorAsync));
+					}
+					if (instance is IMainModInitializer m) {
+						m.OnDisposeMain();
+						WaitSync(m.OnDisposeMainAsync(), nameof(m.OnDisposeMainAsync));
+					}
+
+					instance.OnDispose();
+					WaitSync(instance.OnDisposeAsync(), nameof(instance.OnDisposeAsync));
+				} catch (Exception e) {
+					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to dispose mod {Mod.Metadata.GetId()}@{Mod.Metadata.GetVersion()}", e));
+				}
+			}
+		}
+
+		/// <summary>
+		/// Attend la variante asynchrone d'un callback de dispose, de façon bornée
+		/// (voir <see cref="LoaderManager.WaitSync"/>).
+		/// </summary>
+		private void WaitSync(UniTask task, string callback)
+			=> LoaderManager.WaitSync(task, $"{Mod.Metadata.GetId()}@{Name}.{callback}");
 
 		public void OnUpdate() {
 			if (!IsEnabled() || _state != InitializerState.PostInitialized || !HasUpdate)

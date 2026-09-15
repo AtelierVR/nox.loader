@@ -44,6 +44,13 @@ namespace Nox.ModLoader.Loader {
 			EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
 			if (EditorApplication.isPlaying)
 				OnPlayModeStateChanged(PlayModeStateChange.EnteredPlayMode);
+
+			// Unity ne déroule pas le démontage des mods avant un reload de domaine (recompile,
+			// entrée en Play mode) : on le fait nous-mêmes ici. Sans ça leurs ressources
+			// (sockets d'écoute, threads, handles) survivent au domaine et le domaine suivant
+			// les retrouve occupées — ex. « Une seule utilisation de chaque adresse de socket… ».
+			AssemblyReloadEvents.beforeAssemblyReload -= OnBeforeAssemblyReload;
+			AssemblyReloadEvents.beforeAssemblyReload += OnBeforeAssemblyReload;
 		}
 
 		private static void OnPlayModeStateChanged(PlayModeStateChange state) {
@@ -70,6 +77,11 @@ namespace Nox.ModLoader.Loader {
 					RuntimeLoader.Enable();
 					break;
 				case PlayModeStateChange.ExitingPlayMode:
+					// Les instantiations asynchrones en cours doivent être intégrées pendant que le
+					// domaine (et les mods) sont encore vivants : Unity ne sait pas les terminer après
+					// le reload de domaine et crashe dans AsyncInstantiateOperation::IntegrateInMainThread.
+					InstantiateHelper.CompletePendingInstantiations("exit play mode");
+
 					// Stop runtime entries
 					RuntimeLoader.Disable();
 
@@ -91,6 +103,22 @@ namespace Nox.ModLoader.Loader {
 				default:
 					break;
 			}
+		}
+
+		/// <summary>
+		/// Appelé juste avant que le domaine soit déchargé : on y démonte les mods
+		/// synchroniquement pour qu'ils libèrent leurs ressources à temps.
+		/// </summary>
+		private static void OnBeforeAssemblyReload() {
+			Logger.LogDebug("Domain reload: disposing mods before the domain is torn down...", tag: nameof(EditorLoader));
+
+			// Avant tout démontage : termine les instantiations asynchrones en vol. Sinon leurs
+			// handles de script appartiennent au domaine sortant et l'intégration dans le domaine
+			// suivant casse le runtime (« Resolve of invalid GC handle. The handle is from a
+			// previous domain. » → crash natif dans AsyncInstantiateOperation::IntegrateInMainThread).
+			InstantiateHelper.CompletePendingInstantiations("assembly reload");
+
+			LoaderManager.DisposeSync("assembly reload");
 		}
 
 		[MenuItem("Nox/Play Mode/Reload Mods")]

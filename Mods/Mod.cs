@@ -215,6 +215,31 @@ namespace Nox.ModLoader.Mods {
 			Profiler.Set("disposed", Profiler.At.Start, DateTime.UtcNow);
 		}
 
+		/// <summary>
+		/// Démonte le mod de façon <b>synchrone</b> : désactive les entrées, puis appelle la
+		/// partie synchrone de PreDispose/Dispose.
+		/// <para>
+		/// À utiliser avant un reload de domaine, où aucun <c>await</c> ne peut être pompé.
+		/// Idempotent : une entrée déjà démontée est ignorée par ses propres gardes d'état.
+		/// </para>
+		/// </summary>
+		public void DisposeSync() {
+			Logger.LogDebug($"Disposing (sync) {Metadata.GetId()}@{Metadata.GetVersion()}");
+
+			// Comme Unload() : une entrée n'est démontée que si elle a été désactivée.
+			foreach (var entry in _entryPoints)
+				entry.Disable();
+
+			foreach (var entry in _entryPoints)
+				entry.OnPreDisposeSync();
+
+			foreach (var entry in _entryPoints)
+				entry.OnDisposeSync();
+
+			// Libère les éventuelles bibliothèques natives chargées par le mod
+			CoreAPI?.LibAPI?.Unload();
+		}
+
 		public override string ToString()
 			=> $"{GetType().Name}[id={Metadata.GetId()}, version={Metadata.GetVersion()}]";
 	}

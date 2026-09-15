@@ -1,8 +1,17 @@
+using System;
 using Cysharp.Threading.Tasks;
 using Nox.CCK.Utils;
 
 namespace Nox.ModLoader.Loader {
 	public static class LoaderManager {
+		/// <summary>
+		/// Budget total accordé, par passe de démontage synchrone, à l'attente des callbacks
+		/// <c>*Async</c> des mods (voir <see cref="WaitSync"/>).
+		/// </summary>
+		private static readonly TimeSpan SyncDisposeBudget = TimeSpan.FromSeconds(2);
+
+		private static DateTime _syncDeadline;
+
 		#if UNITY_EDITOR
 		public static void OnEnterPlayMode() {
 			var mods = ModManager.GetMods();
@@ -131,6 +140,76 @@ namespace Nox.ModLoader.Loader {
 			}
 
 			Logger.ClearProgress();
+		}
+
+		/// <summary>
+		/// Démonte tous les mods <b>synchroniquement</b>, dans l'ordre inverse de l'initialisation
+		/// (les dépendants avant leurs dépendances).
+		/// <para>
+		/// Indispensable avant un reload de domaine : Unity ne déroule alors ni les
+		/// <c>OnDestroy</c> ni le démontage normal, et les continuations UniTask ne sont plus
+		/// pompées — impossible d'<c>await</c> ici. Chaque mod libère donc ses ressources
+		/// (sockets d'écoute, threads, handles…) via la partie synchrone de ses callbacks de
+		/// dispose, au lieu de les laisser survivre au domaine suivant.
+		/// </para>
+		/// </summary>
+		/// <param name="reason">Origine de l'appel, pour le log.</param>
+		public static void DisposeSync(string reason) {
+			var mods = ModManager.GetMods();
+			if (mods.Count == 0)
+				return;
+
+			Logger.Log($"Disposing {mods.Count} mods synchronously ({reason})...", tag: nameof(LoaderManager));
+
+			_syncDeadline = DateTime.UtcNow + SyncDisposeBudget;
+
+			for (var i = mods.Count - 1; i >= 0; i--) {
+				var mod = mods[i];
+				try {
+					mod.DisposeSync();
+				} catch (Exception e) {
+					Logger.LogError(
+						new Exception($"Failed to dispose {mod.Metadata.GetId()}@{mod.Metadata.GetVersion()} synchronously", e),
+						tag: nameof(LoaderManager)
+					);
+				}
+			}
+
+			Logger.Log("Mods disposed synchronously.", tag: nameof(LoaderManager));
+		}
+
+		/// <summary>
+		/// Attend la fin d'une tâche de démontage en bloquant (variantes <c>*Async</c> des
+		/// callbacks de dispose, appelées par <see cref="Mods.Mod.DisposeSync"/>).
+		/// <para>
+		/// Deux garde-fous : une tâche déjà terminée n'est jamais bloquante, et l'attente est
+		/// plafonnée par le budget global de la passe. Bloquer le thread principal empêche les
+		/// continuations UniTask repassant par la player loop de s'exécuter : au-delà du budget,
+		/// attendre plus longtemps ne terminerait rien et figerait l'éditeur (cf. l'incident
+		/// « Reload Domain hang »).
+		/// </para>
+		/// </summary>
+		/// <param name="task">Tâche à attendre.</param>
+		/// <param name="what">Libellé pour le log.</param>
+		internal static void WaitSync(UniTask task, string what) {
+			if (task.Status.IsCompleted()) {
+				// Terminée : on récupère le résultat tout de suite (et on propage l'exception éventuelle).
+				task.GetAwaiter().GetResult();
+				return;
+			}
+
+			var remaining = _syncDeadline - DateTime.UtcNow;
+			if (remaining <= TimeSpan.Zero) {
+				Logger.LogWarning($"Not waiting for {what}: the synchronous dispose budget is exhausted.", tag: nameof(LoaderManager));
+				return;
+			}
+
+			try {
+				if (!task.AsTask().Wait(remaining))
+					Logger.LogWarning($"Timed out waiting for {what}.", tag: nameof(LoaderManager));
+			} catch (Exception e) {
+				Logger.LogError(new Exception($"Error while waiting for {what}", e), tag: nameof(LoaderManager));
+			}
 		}
 
 		public static async UniTask Dispose() {
