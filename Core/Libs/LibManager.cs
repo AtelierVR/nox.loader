@@ -38,6 +38,9 @@ namespace Nox.ModLoader.Core.Libs {
 
 		[DllImport("libdl.so.2", SetLastError = true)]
 		private static extern IntPtr dlsym(IntPtr handle, string symbol);
+
+		[DllImport("libdl.so.2", SetLastError = true)]
+		private static extern IntPtr dlerror();
 #elif UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
 		[DllImport("libdl", SetLastError = true)]
 		private static extern IntPtr dlopen(string filename, int flags);
@@ -48,6 +51,9 @@ namespace Nox.ModLoader.Core.Libs {
 
 		[DllImport("libdl", SetLastError = true)]
 		private static extern IntPtr dlsym(IntPtr handle, string symbol);
+
+		[DllImport("libdl", SetLastError = true)]
+		private static extern IntPtr dlerror();
 #endif
 
 		/// <summary>
@@ -115,7 +121,7 @@ namespace Nox.ModLoader.Core.Libs {
 						$"(e.g. Visual C++ Redistributable).");
 #else
 					throw new DllNotFoundException(
-						$"Failed to load native library '{name}' from {fullPath}.");
+						$"Failed to load native library '{name}' from {fullPath}: {LastNativeError()}");
 #endif
 				}
 
@@ -158,6 +164,27 @@ namespace Nox.ModLoader.Core.Libs {
 				}
 				_libCache.Remove(name);
 			}
+		}
+
+		/// <summary>
+		/// Message of the last native loader error (<c>dlerror</c>). This turns an opaque
+		/// "failed to load" into an actionable message such as
+		/// <c>libcrypto.so.3: cannot open shared object file: No such file or directory</c>.
+		/// Must be called immediately after the failing <c>dlopen</c>.
+		/// </summary>
+		private static string LastNativeError() {
+#if UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX || UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
+			try {
+				var message = dlerror();
+				return message != IntPtr.Zero
+					? Marshal.PtrToStringAnsi(message)
+					: "unknown dlopen error";
+			} catch {
+				return "unknown dlopen error";
+			}
+#else
+			return "unknown error";
+#endif
 		}
 
 		/// <summary>
@@ -248,16 +275,28 @@ namespace Nox.ModLoader.Core.Libs {
 
 		internal static object Lock => _lock;
 
+		// Both values read the current Unity build target (PlatformExtensions.CurrentPlatform), which
+		// is an editor-only, main-thread-only API. Native exports, however, are resolved lazily from
+		// background threads (e.g. the FFmpeg read thread), where calling it throws
+		// "get_activeBuildTarget can only be called from the main thread". The first call happens on
+		// the main thread while pre-loading libraries, so worker threads only ever read the cache.
+		private static string _extension;
+		private static string[] _subFolders;
+
 		/// <summary>
 		/// Returns the prioritized list of compatible plugin subfolder names for the current
 		/// platform and CPU architecture (delegates to <see cref="Library.CurrentSubFolders"/>).
+		/// Cached — see the note on <see cref="_subFolders"/>.
 		/// </summary>
 		public static string[] GetSubFolders()
-			=> Library.CurrentSubFolders;
+			=> _subFolders ??= Library.CurrentSubFolders;
 
-		/// <summary>Public extension accessor (mirrors ILibAPI.GetExtension).</summary>
+		/// <summary>
+		/// Public extension accessor (mirrors ILibAPI.GetExtension).
+		/// Cached — see the note on <see cref="_extension"/>.
+		/// </summary>
 		public static string GetExtension()
-			=> Library.CurrentLibraryExtension;
+			=> _extension ??= Library.CurrentLibraryExtension;
 
 		/// <summary>Global fallback plugin folders (shared across all mods).</summary>
 		public static string[] GetGlobalPluginFolders() {
