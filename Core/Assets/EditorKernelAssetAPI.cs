@@ -10,6 +10,7 @@ using System.Linq;
 using Cysharp.Threading.Tasks;
 using Nox.CCK.Utils;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using Nox.CCK;
 
 namespace Nox.ModLoader.Cores.Assets {
@@ -51,6 +52,23 @@ namespace Nox.ModLoader.Cores.Assets {
 		}
 		public static string FormatPath(string path)
 			=> AssetAPIExtension.FormatPath(path);
+
+		/// <summary>
+		/// Resolves the asset path of the first scene matching <paramref name="dirpath"/>.
+		/// Returns <c>null</c> when no scene asset matches.
+		/// </summary>
+		private static string FindScenePath(string dirpath) {
+			var formatted = FormatPath(dirpath);
+			return AssetDatabase.FindAssets("t:Scene")
+				.Select(AssetDatabase.GUIDToAssetPath)
+				.FirstOrDefault(p => FormatPath(p) == formatted);
+		}
+
+		/// <summary>
+		/// Maps a runtime <see cref="LoadSceneMode"/> to its editor equivalent.
+		/// </summary>
+		private static OpenSceneMode ToOpenSceneMode(LoadSceneMode mode)
+			=> mode == LoadSceneMode.Additive ? OpenSceneMode.Additive : OpenSceneMode.Single;
 
 
 		public bool HasAsset<T>(ResourceIdentifier path)
@@ -291,19 +309,35 @@ namespace Nox.ModLoader.Cores.Assets {
 			var namespaces = AssetAPIExtension.GetNamespaces(path);
 
 			foreach (var n in namespaces) {
-				var dirpath = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
-				var scenes = AssetDatabase.FindAssets("t:Scene")
-					.Select(AssetDatabase.GUIDToAssetPath)
-					.Where(p => FormatPath(p) == FormatPath(dirpath))
-					.ToArray();
-				if (scenes.Length == 0)
+				var dirpath   = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
+				var scenePath = FindScenePath(dirpath);
+				if (scenePath == null)
 					continue;
-				var scenePath = scenes[0];
-				var scene     = SceneManager.GetSceneByPath(scenePath);
-				if (!scene.isLoaded)
-					await SceneManager.LoadSceneAsync(scenePath, mode);
-				scene = SceneManager.GetSceneByPath(scenePath);
-				return scene;
+
+				var scene = SceneManager.GetSceneByPath(scenePath);
+				if (scene.IsValid() && scene.isLoaded)
+					return scene;
+
+				await UniTask.Yield(); // Make it properly async
+
+				// SceneManager.LoadSceneAsync is unusable here: it requires the scene to be
+				// registered in the build settings, which package/mod scenes never are. The
+				// editor APIs below load a scene straight from its asset path instead.
+				if (Application.isPlaying) {
+					// OpenScene is rejected during play mode; LoadSceneInPlayMode is its
+					// play-mode counterpart and also ignores the build settings.
+					scene = EditorSceneManager.LoadSceneInPlayMode(scenePath, new LoadSceneParameters(mode));
+
+					// The load is deferred to the next frame, so wait for it to complete
+					// before handing the scene back to the caller.
+					if (scene.IsValid() && !scene.isLoaded)
+						await UniTask.WaitUntil(() => !scene.IsValid() || scene.isLoaded);
+				} else {
+					scene = EditorSceneManager.OpenScene(scenePath, ToOpenSceneMode(mode));
+				}
+
+				// Guard against an invalid handle so callers never dereference a broken scene.
+				return scene.IsValid() ? scene : default;
 			}
 
 			return default;
@@ -314,17 +348,22 @@ namespace Nox.ModLoader.Cores.Assets {
 			var namespaces = AssetAPIExtension.GetNamespaces(path);
 
 			foreach (var n in namespaces) {
-				var dirpath = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
-				var scenes = AssetDatabase.FindAssets("t:Scene")
-					.Select(AssetDatabase.GUIDToAssetPath)
-					.Where(p => FormatPath(p) == FormatPath(dirpath))
-					.ToArray();
-				if (scenes.Length == 0)
+				var dirpath   = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
+				var scenePath = FindScenePath(dirpath);
+				if (scenePath == null)
 					continue;
-				var scenePath = scenes[0];
-				var scene     = SceneManager.GetSceneByPath(scenePath);
-				if (scene.isLoaded)
+
+				await UniTask.Yield(); // Make it properly async
+
+				var scene = SceneManager.GetSceneByPath(scenePath);
+				if (!scene.IsValid() || !scene.isLoaded)
+					return;
+
+				// Mirrors LoadInternalWorld: CloseScene is rejected during play mode.
+				if (Application.isPlaying)
 					await SceneManager.UnloadSceneAsync(scene);
+				else
+					EditorSceneManager.CloseScene(scene, true);
 				return;
 			}
 		}
@@ -335,12 +374,7 @@ namespace Nox.ModLoader.Cores.Assets {
 
 			foreach (var n in namespaces) {
 				var dirpath = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
-
-				var scenes = AssetDatabase.FindAssets("t:Scene")
-					.Select(AssetDatabase.GUIDToAssetPath)
-					.Where(p => FormatPath(p) == FormatPath(dirpath))
-					.ToArray();
-				if (scenes.Length != 0)
+				if (FindScenePath(dirpath) != null)
 					return true;
 			}
 
@@ -352,17 +386,11 @@ namespace Nox.ModLoader.Cores.Assets {
 			var namespaces = AssetAPIExtension.GetNamespaces(path);
 
 			foreach (var n in namespaces) {
-				var dirpath = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
-
-				var scenes = AssetDatabase.FindAssets("t:Scene")
-					.Select(AssetDatabase.GUIDToAssetPath)
-					.Where(p => FormatPath(p) == FormatPath(dirpath))
-					.ToArray();
-				if (scenes.Length == 0)
+				var dirpath   = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
+				var scenePath = FindScenePath(dirpath);
+				if (scenePath == null)
 					continue;
-				var scenePath = scenes[0];
-				var scene     = SceneManager.GetSceneByPath(scenePath);
-				return scene.isLoaded;
+				return SceneManager.GetSceneByPath(scenePath).isLoaded;
 			}
 
 			return false;
@@ -373,16 +401,11 @@ namespace Nox.ModLoader.Cores.Assets {
 			var namespaces = AssetAPIExtension.GetNamespaces(path);
 
 			foreach (var n in namespaces) {
-				var dirpath = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
-
-				var scenes = AssetDatabase.FindAssets("t:Scene")
-					.Select(AssetDatabase.GUIDToAssetPath)
-					.Where(p => FormatPath(p) == FormatPath(dirpath))
-					.ToArray();
-				if (scenes.Length == 0)
+				var dirpath   = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
+				var scenePath = FindScenePath(dirpath);
+				if (scenePath == null)
 					continue;
-				var scenePath = scenes[0];
-				var scene     = SceneManager.GetSceneByPath(scenePath);
+				var scene = SceneManager.GetSceneByPath(scenePath);
 				return scene.isLoaded ? scene : default;
 			}
 
