@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using Nox.CCK.Utils;
+using UnityEngine;
 
 namespace Nox.ModLoader.Core.Libs {
 	/// <summary>
@@ -280,12 +281,17 @@ namespace Nox.ModLoader.Core.Libs {
 		// background threads (e.g. the FFmpeg read thread), where calling it throws
 		// "get_activeBuildTarget can only be called from the main thread". The first call happens on
 		// the main thread while pre-loading libraries, so worker threads only ever read the cache.
+		// _subFolders holds relative sub-paths (e.g. "windows/x64") to combine with a Plugins root;
+		// the empty entry means the root folder itself.
 		private static string _extension;
 		private static string[] _subFolders;
 
 		/// <summary>
-		/// Returns the prioritized list of compatible plugin subfolder names for the current
-		/// platform and CPU architecture (delegates to <see cref="Library.CurrentSubFolders"/>).
+		/// Returns the prioritized list of plugin sub-paths (relative to the <c>Plugins</c> root)
+		/// for the current platform and CPU architecture, ordered from most specific to least:
+		/// <c>&lt;platform&gt;/&lt;arch&gt;</c>, <c>&lt;platform&gt;</c>, then <c>""</c> (the root itself).
+		/// Example on Windows x64: <c>["windows/x64", "windows", ""]</c>.
+		/// Delegates to <see cref="Library.CurrentSubFolders"/>.
 		/// Cached — see the note on <see cref="_subFolders"/>.
 		/// </summary>
 		public static string[] GetSubFolders()
@@ -298,18 +304,23 @@ namespace Nox.ModLoader.Core.Libs {
 		public static string GetExtension()
 			=> _extension ??= Library.CurrentLibraryExtension;
 
-		/// <summary>Global fallback plugin folders (shared across all mods).</summary>
+		/// <summary>
+		/// Global fallback plugin folders (shared across all mods), i.e. the game's
+		/// <c>&lt;dataPath&gt;/Plugins/&lt;platform&gt;/&lt;arch&gt;</c>, <c>&lt;dataPath&gt;/Plugins/&lt;platform&gt;</c>
+		/// and finally <c>&lt;dataPath&gt;/Plugins</c> itself (the empty sub-path).
+		/// </summary>
 		public static string[] GetGlobalPluginFolders() {
-			var pluginsBase = Path.Combine(
-				UnityEngine.Application.dataPath, "Plugins");
-			return GetSubFolders().Select(s => Path.Combine(pluginsBase, s))
-				.Append(pluginsBase)
+			var root = Path.Combine(Application.dataPath, "Plugins");
+			return GetSubFolders()
+				.Select(s => Path.Combine(root, s))
 				.Where(Directory.Exists)
 				.ToArray();
 		}
 
 		/// <summary>
 		/// Search <paramref name="modFolders"/> then global folders for <paramref name="name"/>.
+		/// Both lists are ordered most-specific-first, so the native binary is picked from
+		/// <c>&lt;platform&gt;/&lt;arch&gt;</c> before <c>&lt;platform&gt;</c> and finally the root folder.
 		/// Returns the full path or <c>null</c>.
 		/// </summary>
 		public static string ToPath(string name, string[] modFolders) {

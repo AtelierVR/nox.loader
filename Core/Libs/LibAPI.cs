@@ -1,10 +1,8 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Nox.CCK.Mods.Libs;
 using Nox.ModLoader.Mods;
-using UnityEngine;
 
 namespace Nox.ModLoader.Core.Libs {
 	public class LibAPI : ILibAPI {
@@ -18,10 +16,14 @@ namespace Nox.ModLoader.Core.Libs {
 		public string[] GetFolders() {
 			var subFolders = GetSubFolders();
 
-			// Helper: build a Plugins/{sub} list from a root folder (only existing dirs)
+			// Helper: build a Plugins/{subPath} list from a mod root folder (only existing dirs).
+			// Sub-paths are ordered most-specific-first (<platform>/<arch>, <platform>, "")
+			// and the empty sub-path resolves to the Plugins folder itself, so the list always
+			// ends with Plugins as the last-resort fallback.
 			string[] Build(string root) {
-				return subFolders.Select(s => Path.Combine(root, "Plugins", s))
-					.Append(Path.Combine(root, "Plugins"))
+				var pluginsRoot = Path.Combine(root, "Plugins");
+				return subFolders
+					.Select(sub => Path.Combine(pluginsRoot, sub))
 					.Where(Directory.Exists)
 					.ToArray();
 			}
@@ -35,8 +37,8 @@ namespace Nox.ModLoader.Core.Libs {
 			return Array.Empty<string>();
 			#else
 			if (_mod is KernelMod) {
-				// Kernel mods ship their native plugins into the game's Plugins/<sub>/ folder
-				return Build(Application.dataPath);
+				// Kernel mods ship their native plugins into the game's Plugins/<platform>/<arch>/ folder
+				return Build(UnityEngine.Application.dataPath);
 			} else {
 				// External (folder) mods keep plugins next to their bundle
 				var folder = _mod.GetData<string>("folder");
