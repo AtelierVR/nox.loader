@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using Nox.CCK.Utils;
 using UnityEngine;
+using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.ModLoader.Core.Libs {
 	/// <summary>
@@ -17,6 +18,12 @@ namespace Nox.ModLoader.Core.Libs {
 	internal static class LibManager {
 		private struct LibEntry {
 			public IntPtr Handle;
+			/// <summary>Path resolved by <see cref="Load"/>, used to load the library lazily when needed.</summary>
+			public string Path;
+			/// <summary>True when <see cref="Handle"/> comes from our own load, so we must release it.</summary>
+			public bool Owned;
+			/// <summary>True once loading failed, so lookups do not retry the load for every export.</summary>
+			public bool Failed;
 			public HashSet<string> ModIds;
 		}
 
@@ -29,6 +36,15 @@ namespace Nox.ModLoader.Core.Libs {
 
 		[DllImport("kernel32", SetLastError = true, CharSet = CharSet.Unicode)]
 		private static extern IntPtr GetModuleHandle(string lpModuleName);
+
+		[DllImport("kernel32", SetLastError = true, CharSet = CharSet.Unicode, EntryPoint = "LoadLibraryExW")]
+		private static extern IntPtr LoadLibraryEx(string lpFileName, IntPtr hFile, uint dwFlags);
+
+		[DllImport("kernel32", SetLastError = true)]
+		private static extern bool FreeLibrary(IntPtr hModule);
+
+		/// <summary>Searches the loaded DLL's own directory for its dependencies.</summary>
+		private const uint LOAD_WITH_ALTERED_SEARCH_PATH = 0x00000008;
 #elif UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX
 		[DllImport("libdl.so.2", SetLastError = true)]
 		private static extern IntPtr dlopen(string filename, int flags);
@@ -94,14 +110,12 @@ namespace Nox.ModLoader.Core.Libs {
 				IntPtr handle;
 
 #if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
-				// Unity already manages native plugin resolution (see the .meta PluginImporter
-				// platform settings). Manually calling LoadLibrary here can fail with error 0x7E
-				// (ERROR_MOD_NOT_FOUND) when the library has sibling dependencies that Unity would
-				// otherwise resolve. We therefore do NOT physically pre-load on Windows; instead we
-				// record the mod reference and lazily resolve the module handle (already loaded by
-				// Unity) in GetHandle/GetSymbol via GetModuleHandle.
+				// Unity usually resolves native plugins itself (see the .meta PluginImporter settings), so
+				// we only remember the path here; GetHandle loads it lazily when Unity has not — a plugin
+				// disabled for this platform, or one shipped from a mod folder, which Unity never imports.
 				_libCache[name] = new LibEntry {
-					Handle = IntPtr.Zero, // resolved lazily via GetModuleHandle
+					Handle = IntPtr.Zero, // resolved lazily by GetHandle
+					Path   = fullPath,
 					ModIds = new HashSet<string> { modId },
 				};
 				return 1;
@@ -128,6 +142,8 @@ namespace Nox.ModLoader.Core.Libs {
 
 				_libCache[name] = new LibEntry {
 					Handle = handle,
+					Path   = fullPath,
+					Owned  = true,
 					ModIds = new HashSet<string> { modId },
 				};
 
@@ -151,12 +167,12 @@ namespace Nox.ModLoader.Core.Libs {
 					return;
 				}
 
-				// Last reference — physically unload (if we loaded it).
-				// On Windows the native plugin is managed by Unity's plugin system, so we must
-				// NOT FreeLibrary it (and GetModuleHandle handles cannot be freed anyway).
+				// Last reference — physically unload. A handle coming from GetModuleHandle holds no
+				// reference of ours, so only a library we loaded ourselves is released here.
 				if (entry.Handle != IntPtr.Zero) {
 #if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
-					// Intentionally no-op on Windows — Unity owns the native plugin lifecycle.
+					if (entry.Owned)
+						FreeLibrary(entry.Handle);
 #elif UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX
 					dlclose(entry.Handle);
 #elif UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
@@ -203,9 +219,8 @@ namespace Nox.ModLoader.Core.Libs {
 
 		/// <summary>
 		/// Returns the native module handle for <paramref name="name"/> if (and only if)
-		/// <paramref name="modId"/> previously loaded it. On Windows the module is assumed to be
-		/// loaded by Unity's native plugin system, so the handle is resolved lazily via
-		/// <c>GetModuleHandle</c> rather than a manual LoadLibrary.
+		/// <paramref name="modId"/> previously loaded it. On Windows the handle is resolved lazily and
+		/// cached, including a definitive failure (see <see cref="Load"/>).
 		/// </summary>
 		public static IntPtr GetHandle(string name, string modId)
 		{
@@ -216,10 +231,30 @@ namespace Nox.ModLoader.Core.Libs {
 #if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
 				// Cache the resolved module handle (GetModuleHandle is cheap but repeated calls
 				// across every symbol resolution are wasteful).
-				if (entry.Handle == IntPtr.Zero)
+				if (entry.Handle == IntPtr.Zero && !entry.Failed)
 				{
 					var moduleName = name + GetExtension();
 					entry.Handle = GetModuleHandle(moduleName);
+
+					// Not in the process: load it ourselves from the path resolved by Load().
+					// LOAD_WITH_ALTERED_SEARCH_PATH makes the library's own directory the search root, so
+					// sibling dependencies resolve even though only its full path is known.
+					if (entry.Handle == IntPtr.Zero && !string.IsNullOrEmpty(entry.Path))
+					{
+						entry.Handle = LoadLibraryEx(entry.Path, IntPtr.Zero, LOAD_WITH_ALTERED_SEARCH_PATH);
+						entry.Owned  = entry.Handle != IntPtr.Zero;
+
+						if (entry.Handle == IntPtr.Zero)
+						{
+							entry.Failed = true;
+							var win32Err = Marshal.GetLastWin32Error();
+							Logger.LogError(
+								$"Failed to load native library '{entry.Path}' (error 0x{win32Err:X8}). " +
+								"The library may be missing dependencies (e.g. Visual C++ Redistributable).",
+								tag: nameof(LibManager));
+						}
+					}
+
 					_libCache[name] = entry;
 				}
 #endif
