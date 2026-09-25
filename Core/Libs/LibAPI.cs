@@ -17,9 +17,9 @@ namespace Nox.ModLoader.Core.Libs {
 			var subFolders = GetSubFolders();
 
 			// Helper: build a Plugins/{subPath} list from a mod root folder (only existing dirs).
-			// Sub-paths are ordered most-specific-first (<platform>/<arch>, <platform>, "")
-			// and the empty sub-path resolves to the Plugins folder itself, so the list always
-			// ends with Plugins as the last-resort fallback.
+			// Sub-paths are ordered most-specific-first (<platform>/<arch>, <platform>, the <arch>
+			// folder of a player build) and the empty sub-path resolves to the Plugins folder itself,
+			// so the list always ends with Plugins as the last-resort fallback.
 			string[] Build(string root) {
 				var pluginsRoot = Path.Combine(root, "Plugins");
 				return subFolders

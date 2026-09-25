@@ -102,9 +102,21 @@ namespace Nox.ModLoader.Core.Libs {
 					}
 				}
 
-				if (path == null)
+				if (path == null) {
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+					var loaded = GetModuleHandle(name + ext);
+					if (loaded != IntPtr.Zero) {
+						_libCache[name] = new LibEntry {
+							Handle = loaded,
+							ModIds = new HashSet<string> { modId },
+						};
+						return 1;
+					}
+#endif
 					throw new DllNotFoundException(
-						$"Could not find native library '{name}' in search folders.");
+						$"Could not find native library '{name}' (looked for '{filename}' in: "
+						+ (searchFolders.Length > 0 ? string.Join(", ", searchFolders) : "no folder") + ").");
+				}
 
 				// Physically load — set the DLL directory first so dependencies resolve
 				var fullPath = Path.GetFullPath(path);
@@ -186,6 +198,7 @@ namespace Nox.ModLoader.Core.Libs {
 		}
 
 		/// <summary>
+
 		/// Message of the last native loader error (<c>dlerror</c>). This turns an opaque
 		/// "failed to load" into an actionable message such as
 		/// <c>libcrypto.so.3: cannot open shared object file: No such file or directory</c>.
@@ -318,21 +331,23 @@ namespace Nox.ModLoader.Core.Libs {
 		// background threads (e.g. the FFmpeg read thread), where calling it throws
 		// "get_activeBuildTarget can only be called from the main thread". The first call happens on
 		// the main thread while pre-loading libraries, so worker threads only ever read the cache.
-		// _subFolders holds relative sub-paths (e.g. "windows/x64") to combine with a Plugins root;
-		// the empty entry means the root folder itself.
+		// _subFolders holds relative sub-paths (e.g. "windows/x64", "x64") to combine with a
+		// Plugins root; the empty entry means the root folder itself.
 		private static string _extension;
 		private static string[] _subFolders;
 
 		/// <summary>
 		/// Returns the prioritized list of plugin sub-paths (relative to the <c>Plugins</c> root)
-		/// for the current platform and CPU architecture, ordered from most specific to least:
-		/// <c>&lt;platform&gt;/&lt;arch&gt;</c>, <c>&lt;platform&gt;</c>, then <c>""</c> (the root itself).
-		/// Example on Windows x64: <c>["windows/x64", "windows", ""]</c>.
-		/// Delegates to <see cref="Library.CurrentSubFolders"/>.
+		/// where a native binary may live, ordered from most specific to least:
+		/// <c>&lt;platform&gt;/&lt;arch&gt;</c> (e.g. <c>windows/x64</c>), <c>&lt;platform&gt;</c>
+		/// (e.g. <c>windows</c>), the <c>&lt;arch&gt;</c> folder of a player build (<c>x64</c>, …)
+		/// and finally <c>""</c> (the root itself).
+		/// Example on Windows x64: <c>["windows/x64", "windows", "x64", ""]</c>.
+		/// Delegates to <see cref="Library.CurrentPluginSubFolders"/>.
 		/// Cached — see the note on <see cref="_subFolders"/>.
 		/// </summary>
 		public static string[] GetSubFolders()
-			=> _subFolders ??= Library.CurrentSubFolders;
+			=> _subFolders ??= Library.CurrentPluginSubFolders;
 
 		/// <summary>
 		/// Public extension accessor (mirrors ILibAPI.GetExtension).
@@ -343,8 +358,9 @@ namespace Nox.ModLoader.Core.Libs {
 
 		/// <summary>
 		/// Global fallback plugin folders (shared across all mods), i.e. the game's
-		/// <c>&lt;dataPath&gt;/Plugins/&lt;platform&gt;/&lt;arch&gt;</c>, <c>&lt;dataPath&gt;/Plugins/&lt;platform&gt;</c>
-		/// and finally <c>&lt;dataPath&gt;/Plugins</c> itself (the empty sub-path).
+		/// <c>&lt;dataPath&gt;/Plugins/&lt;platform&gt;/&lt;arch&gt;</c>, <c>&lt;dataPath&gt;/Plugins/&lt;platform&gt;</c>,
+		/// <c>&lt;dataPath&gt;/Plugins/&lt;arch&gt;</c> (the layout of a player build) and
+		/// finally <c>&lt;dataPath&gt;/Plugins</c> itself (the empty sub-path).
 		/// </summary>
 		public static string[] GetGlobalPluginFolders() {
 			var root = Path.Combine(Application.dataPath, "Plugins");
