@@ -45,7 +45,8 @@ namespace Nox.ModLoader.Core.Libs {
 
 		/// <summary>Searches the loaded DLL's own directory for its dependencies.</summary>
 		private const uint LOAD_WITH_ALTERED_SEARCH_PATH = 0x00000008;
-#elif UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX
+#endif
+#if UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX
 		[DllImport("libdl.so.2", SetLastError = true)]
 		private static extern IntPtr dlopen(string filename, int flags);
 		private const int RTLD_NOW = 2;
@@ -58,7 +59,8 @@ namespace Nox.ModLoader.Core.Libs {
 
 		[DllImport("libdl.so.2", SetLastError = true)]
 		private static extern IntPtr dlerror();
-#elif UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
+#endif
+#if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
 		[DllImport("libdl", SetLastError = true)]
 		private static extern IntPtr dlopen(string filename, int flags);
 		private const int RTLD_NOW = 2;
