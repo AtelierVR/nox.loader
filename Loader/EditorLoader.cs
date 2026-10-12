@@ -35,12 +35,16 @@ namespace Nox.ModLoader.Loader {
 
 			await LoaderManager.Discover();
 
-			// Initialize editors entries
+			// Initialize editors entries. The subscriptions are made idempotent on purpose: with the
+			// domain reload disabled when entering Play Mode (see Nox.Editor.DisableDomainReload) this
+			// method can run again while the previous handlers are still registered.
+			EditorApplication.update -= LoaderManager.OnUpdate;
 			EditorApplication.update += LoaderManager.OnUpdate;
 			LoaderManager.Enable(EntryPoint.MainEntry, EntryPoint.EditorEntry);
 			await LoaderManager.Initialize();
 
 			// Handle play mode state changes
+			EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
 			EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
 			if (EditorApplication.isPlaying)
 				OnPlayModeStateChanged(PlayModeStateChange.EnteredPlayMode);
@@ -53,9 +57,33 @@ namespace Nox.ModLoader.Loader {
 			AssemblyReloadEvents.beforeAssemblyReload += OnBeforeAssemblyReload;
 		}
 
+		/// <summary>
+		/// Whether Unity tears the scripting domain down when entering Play Mode
+		/// (Editor Settings ▸ Enter Play Mode Options ▸ Reload Domain).
+		/// <para>
+		/// When it does not, the editor-side mods stay initialized across the transition and
+		/// <c>ExitingEditMode</c> becomes the last moment where pending work can be finished with a
+		/// live domain and before the scene is reloaded.
+		/// </para>
+		/// </summary>
+		private static bool DomainReloadOnPlay
+			=> !EditorSettings.enterPlayModeOptionsEnabled
+				|| (EditorSettings.enterPlayModeOptions & EnterPlayModeOptions.DisableDomainReload) == 0;
+
 		private static void OnPlayModeStateChanged(PlayModeStateChange state) {
 			switch (state) {
 				case PlayModeStateChange.EnteredPlayMode:
+					// Player Settings are applied when Play Mode starts, and without a domain reload the
+					// assignment done at loader initialization is not re-applied on every Play.
+					Application.runInBackground = true;
+
+					Logger.LogDebug(
+						DomainReloadOnPlay
+							? "Play Mode entered after a domain reload: mods were re-created from scratch."
+							: "Play Mode entered without a domain reload: editor-side mods stay initialized.",
+						tag: nameof(EditorLoader)
+					);
+
 					// Check if auto-start is enabled
 					if (!AutoStart) {
 						Logger.LogDebug("Mod Loader auto-start is disabled for Play Mode.", tag: nameof(EditorLoader));
@@ -100,6 +128,11 @@ namespace Nox.ModLoader.Loader {
 					ReloadMods();
 					break;
 				case PlayModeStateChange.ExitingEditMode:
+					// Last callback with the domain and the objects still alive before Play Mode loads the
+					// scene: finish pending asynchronous instantiations, otherwise they would be integrated
+					// against objects the scene reload is about to destroy.
+					InstantiateHelper.CompletePendingInstantiations("enter play mode");
+					break;
 				default:
 					break;
 			}
