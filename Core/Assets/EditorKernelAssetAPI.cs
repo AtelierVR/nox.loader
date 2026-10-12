@@ -5,13 +5,13 @@ using UnityEngine.SceneManagement;
 using Object = UnityEngine.Object;
 using Logger = Nox.CCK.Utils.Logger;
 using System.IO;
-using System.Collections.Generic;
 using System.Linq;
 using Cysharp.Threading.Tasks;
 using Nox.CCK.Utils;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using Nox.CCK;
+using System.Collections.Concurrent;
 
 namespace Nox.ModLoader.Cores.Assets {
 
@@ -21,6 +21,80 @@ namespace Nox.ModLoader.Cores.Assets {
 
 		private readonly ModLoader.Mods.KernelMod _kernelMod;
 		private bool _loaded;
+
+		/// <summary>
+		/// Outcome of probing one asset path inside a mod's assets folder.
+		/// </summary>
+		private sealed class AssetProbe {
+			/// <summary>A <see cref="SymbolicAsset"/> lives at the path (an indirection).</summary>
+			public bool HasSymbolic;
+
+			/// <summary>Target of that symbolic asset (possibly <c>null</c>).</summary>
+			public string SymbolicTarget;
+
+			/// <summary>The asset itself when the path is not an indirection.</summary>
+			public Object Asset;
+
+			/// <summary>Whether <see cref="Asset"/> holds something.</summary>
+			public bool HasAsset;
+		}
+
+		/// <summary>
+		/// Memoized probes, keyed by path and type. Each probe is up to two
+		/// <see cref="AssetDatabase.LoadAssetAtPath{T}"/> calls on the main thread, and a profiler
+		/// capture showed 13.5k <c>ReadObjectFromSerializedFile</c> and 3.8k
+		/// <c>PackageInfo.GetPackageByAssetPath</c> triggered by resolving the same paths over and over.
+		/// </summary>
+		private static readonly ConcurrentDictionary<string, AssetProbe> Probes = new();
+
+		[InitializeOnLoadMethod]
+		private static void TrackAssetDatabase() {
+			EditorApplication.projectChanged -= ClearProbes;
+			EditorApplication.projectChanged += ClearProbes;
+		}
+
+		private static void ClearProbes() {
+			Probes.Clear();
+			RelativePaths.Clear();
+			_folders = null;
+		}
+
+		/// <summary>
+		/// Resolves <paramref name="dirpath"/> through the symbolic-asset indirection, reusing the
+		/// previous answer; a cached reference Unity has since destroyed is re-resolved. Symbolic
+		/// targets are never cached as assets: their resolution walks the other mods' APIs.
+		/// </summary>
+		private static AssetProbe ProbeAsset<T>(string dirpath)
+			where T : Object {
+			var key = dirpath + "|" + typeof(T).Name;
+			if (Probes.TryGetValue(key, out var cached)) {
+				if (cached.HasSymbolic || !cached.HasAsset || cached.Asset)
+					return cached;
+
+				Probes.TryRemove(key, out _);
+			}
+
+			var probe    = new AssetProbe();
+			var symbolic = AssetDatabase.LoadAssetAtPath<SymbolicAsset>(dirpath + ".asset");
+			if (symbolic) {
+				probe.HasSymbolic    = true;
+				probe.SymbolicTarget = symbolic.Target;
+			} else {
+				probe.Asset    = AssetDatabase.LoadAssetAtPath<T>(dirpath);
+				probe.HasAsset = probe.Asset;
+			}
+
+			Probes[key] = probe;
+			return probe;
+		}
+
+		/// <summary>
+		/// Memoized <see cref="ToRelative"/> answers. The conversion canonicalizes the absolute path
+		/// (which splits it) and re-combines it, and every asset lookup repeated it on the same path:
+		/// a capture showed 189 <c>SplitKeepEmptyEntries</c> over 200 frames originating here.
+		/// Cleared with the probes when the project changes, so a moved project cannot serve stale paths.
+		/// </summary>
+		private static readonly ConcurrentDictionary<string, string> RelativePaths = new();
 
 		private static (string abs, string rel)[] _folders;
 		public override string ToString() 
@@ -38,6 +112,13 @@ namespace Nox.ModLoader.Cores.Assets {
 		}
 
 		public static string ToRelative(string path) {
+			if (RelativePaths.TryGetValue(path, out var memoized))
+				return memoized;
+
+			return RelativePaths[path] = ResolveRelative(path);
+		}
+
+		private static string ResolveRelative(string path) {
 			path = Path.GetFullPath(path);
 
 			foreach (var folder in GetFolders()) {
@@ -114,10 +195,9 @@ namespace Nox.ModLoader.Cores.Assets {
 
 			foreach (var n in namespaces) {
 				var dirpath = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
-				var symbolic = AssetDatabase.LoadAssetAtPath<SymbolicAsset>(dirpath + ".asset");
-				if (symbolic) return HasAsset<T>(symbolic.Target);
-				if (AssetDatabase.LoadAssetAtPath<T>(dirpath))
-					return true;
+				var probe   = ProbeAsset<T>(dirpath);
+				if (probe.HasSymbolic) return HasAsset<T>(probe.SymbolicTarget);
+				if (probe.HasAsset) return true;
 			}
 
 			return false;
@@ -130,11 +210,9 @@ namespace Nox.ModLoader.Cores.Assets {
 
 			foreach (var n in namespaces) {
 				var dirpath = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
-				var symbolic = AssetDatabase.LoadAssetAtPath<SymbolicAsset>(dirpath + ".asset");
-				if (symbolic) return GetAsset<T>(symbolic.Target);
-				var asset = AssetDatabase.LoadAssetAtPath<T>(dirpath);
-				if (asset)
-					return asset;
+				var probe   = ProbeAsset<T>(dirpath);
+				if (probe.HasSymbolic) return GetAsset<T>(probe.SymbolicTarget);
+				if (probe.HasAsset) return (T)probe.Asset;
 			}
 
 			return default;
@@ -186,9 +264,8 @@ namespace Nox.ModLoader.Cores.Assets {
 
 			foreach (var n in namespaces) {
 				var dirpath = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
-				if (AssetDatabase.LoadAssetAtPath<SymbolicAsset>(dirpath + ".asset")) return true;
-				if (AssetDatabase.LoadAssetAtPath<T>(dirpath))
-					return true;
+				var probe   = ProbeAsset<T>(dirpath);
+				if (probe.HasSymbolic || probe.HasAsset) return true;
 			}
 
 			return false;
@@ -203,11 +280,9 @@ namespace Nox.ModLoader.Cores.Assets {
 
 			foreach (var n in namespaces) {
 				var dirpath = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
-				var symbolic = AssetDatabase.LoadAssetAtPath<SymbolicAsset>(dirpath + ".asset");
-				if (symbolic) return await GetAssetAsync<T>(symbolic.Target);
-				var asset = AssetDatabase.LoadAssetAtPath<T>(dirpath);
-				if (asset)
-					return asset;
+				var probe   = ProbeAsset<T>(dirpath);
+				if (probe.HasSymbolic) return await GetAssetAsync<T>(probe.SymbolicTarget);
+				if (probe.HasAsset) return (T)probe.Asset;
 			}
 
 			return default;

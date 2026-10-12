@@ -174,23 +174,23 @@ namespace Nox.ModLoader.Mods {
 
 		public void Update() {
 			if (!HasUpdate) return;
-			Profiler.Set("update", Profiler.At.Start, DateTime.UtcNow);
+			Profiler.Set("update", Profiler.At.Start);
 			foreach (var entry in _entryPoints) entry.OnUpdate();
-			Profiler.Set("updated", Profiler.At.Start, DateTime.UtcNow);
+			Profiler.Set("updated", Profiler.At.Start);
 		}
 
 		public void FixedUpdate() {
 			if (!HasFixedUpdate) return;
-			Profiler.Set("fixed_update", Profiler.At.Start, DateTime.UtcNow);
+			Profiler.Set("fixed_update", Profiler.At.Start);
 			foreach (var entry in _entryPoints) entry.OnFixedUpdate();
-			Profiler.Set("fixed_updated", Profiler.At.Start, DateTime.UtcNow);
+			Profiler.Set("fixed_updated", Profiler.At.Start);
 		}
 
 		public void LateUpdate() {
 			if (!HasLateUpdate) return;
-			Profiler.Set("late_update", Profiler.At.Start, DateTime.UtcNow);
+			Profiler.Set("late_update", Profiler.At.Start);
 			foreach (var entry in _entryPoints) entry.OnLateUpdate();
-			Profiler.Set("late_updated", Profiler.At.Start, DateTime.UtcNow);
+			Profiler.Set("late_updated", Profiler.At.Start);
 		}
 
 		#if UNITY_EDITOR

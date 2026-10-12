@@ -9,7 +9,12 @@ namespace Nox.ModLoader.Cores.Events {
     public class EventAPI : CCK.Mods.Events.IEventAPI {
         private readonly ModLoader.Mods.Mod _mod;
         private readonly CCK.Mods.Events.EventEntryFlags _channel;
-        private readonly List<EventSubscription> _subscriptions = new();
+        /// <summary>
+        /// Subscriptions, copy-on-write: every mutation replaces the array instead of editing it in
+        /// place. A dispatch can therefore iterate it directly — no snapshot allocation, and no
+        /// "collection was modified" error when a callback subscribes or unsubscribes mid-dispatch.
+        /// </summary>
+        private EventSubscription[] _subscriptions = Array.Empty<EventSubscription>();
 
         internal EventAPI(ModLoader.Mods.Mod mod, CCK.Mods.Events.EventEntryFlags channel) {
             _mod = mod;
@@ -18,18 +23,32 @@ namespace Nox.ModLoader.Cores.Events {
 
         // ReSharper disable Unity.PerformanceAnalysis
         private void Receive(EventContext context) {
-            var data = new EventData {
-                EventName = context.EventName, Data = context.Data, InternalSource = context.Source, SourceChannel = context.Channel,
-                CallbackFunction = context.Callback ?? (_ => _mod.CoreAPI.LoggerAPI.LogDebug($"Event {context.EventName} had no callback function set."))
-            };
-            foreach (var sub in _subscriptions.ToArray())
-                if (sub.EventName == null || sub.EventName == context.EventName)
+            // Copy-on-write: the field is never edited in place, so reading it into a local gives the
+            // dispatch a stable view of the subscriptions for its whole duration.
+            var subscriptions = _subscriptions;
+
+            // The payload is built on the first interested subscriber only. An Emit is broadcast to
+            // every mod, so building it up-front allocated one EventData per mod per event even when
+            // nobody was listening for that event name (measured: ~40k allocations over ten frames).
+            EventData data = null;
+
+            foreach (var sub in subscriptions)
+                if (sub.EventName == null || sub.EventName == context.EventName) {
+                    data ??= new EventData {
+                            EventName        = context.EventName,
+                            Data             = context.Data,
+                            InternalSource   = context.Source,
+                            SourceChannel    = context.Channel,
+                            CallbackFunction = context.Callback ?? (_ => _mod.CoreAPI.LoggerAPI.LogDebug($"Event {context.EventName} had no callback function set."))
+                        };
+
                     try {
                         sub.Callback(data);
                     } catch (Exception e) {
                         Logger.LogError($"Error while invoking event callback: {e} of event {context.EventName}");
                         Logger.LogError(e);
                     }
+                }
         }
 
         private void Emit(EventContext context) {
@@ -77,15 +96,26 @@ namespace Nox.ModLoader.Cores.Events {
             => Subscribe(new EventSubscription(eventSub));
 
         private CCK.Mods.Events.EventSubscription Subscribe(EventSubscription eventSub) {
-            if (_subscriptions.Exists(sub => sub.UID == eventSub.UID)) {
+            if (HasUid(eventSub.UID)) {
                 eventSub.UID = 0;
-                while (_subscriptions.Exists(sub => sub.UID == eventSub.UID) || eventSub.UID == uint.MaxValue) eventSub.UID++;
+                while (HasUid(eventSub.UID) || eventSub.UID == uint.MaxValue) eventSub.UID++;
                 if (eventSub.UID == uint.MaxValue) return null;
             }
 
-            _subscriptions.Add(eventSub);
-            _subscriptions.Sort((a, b) => a.Weight.CompareTo(b.Weight));
+            var subscriptions = new EventSubscription[_subscriptions.Length + 1];
+            Array.Copy(_subscriptions, subscriptions, _subscriptions.Length);
+            subscriptions[_subscriptions.Length] = eventSub;
+            Array.Sort(subscriptions, (a, b) => a.Weight.CompareTo(b.Weight));
+            _subscriptions = subscriptions;
             return eventSub;
+        }
+
+        private bool HasUid(uint uid) {
+            foreach (var sub in _subscriptions)
+                if (sub != null && sub.UID == uid)
+                    return true;
+
+            return false;
         }
 
         public CCK.Mods.Events.EventSubscription Subscribe(Dictionary<string, object> eventSub)
@@ -94,17 +124,47 @@ namespace Nox.ModLoader.Cores.Events {
         public void Unsubscribe(CCK.Mods.Events.EventSubscription eventSub)
             => Unsubscribe(eventSub.UID);
 
-        internal void Unsubscribe(EventSubscription eventSub)
-            => _subscriptions.Remove(eventSub);
+        internal void Unsubscribe(EventSubscription eventSub) {
+            var index = Array.IndexOf(_subscriptions, eventSub);
+            if (index < 0)
+                return;
+
+            var subscriptions = new EventSubscription[_subscriptions.Length - 1];
+            Array.Copy(_subscriptions, 0, subscriptions, 0, index);
+            Array.Copy(_subscriptions, index + 1, subscriptions, index, _subscriptions.Length - index - 1);
+            _subscriptions = subscriptions;
+        }
 
         public void Unsubscribe(uint uid)
-            => _subscriptions.RemoveAll(sub => sub.UID == uid);
+            => RemoveAll(sub => sub.UID == uid);
 
         public void UnsubscribeAll()
-            => _subscriptions.Clear();
+            => _subscriptions = Array.Empty<EventSubscription>();
 
         public void UnsubscribeAll(string eventName)
-            => _subscriptions.RemoveAll(sub => sub.EventName == eventName);
+            => RemoveAll(sub => sub.EventName == eventName);
+
+        /// <summary>
+        /// Drops every subscription matching <paramref name="predicate"/>, copy-on-write: the array
+        /// currently being iterated by an in-flight dispatch is left untouched.
+        /// </summary>
+        private void RemoveAll(Predicate<EventSubscription> predicate) {
+            var remaining = 0;
+            foreach (var sub in _subscriptions)
+                if (!predicate(sub))
+                    remaining++;
+
+            if (remaining == _subscriptions.Length)
+                return;
+
+            var subscriptions = new EventSubscription[remaining];
+            var index         = 0;
+            foreach (var sub in _subscriptions)
+                if (!predicate(sub))
+                    subscriptions[index++] = sub;
+
+            _subscriptions = subscriptions;
+        }
     }
 
     public class EventSubscription : CCK.Mods.Events.EventSubscription {

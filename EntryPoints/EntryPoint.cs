@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using Cysharp.Threading.Tasks;
@@ -28,21 +29,37 @@ namespace Nox.ModLoader.EntryPoints {
 		public bool IsEnabled()
 			=> _enabled;
 
-		public TI GetInstance<TI>()
-			=> _instances != null
-				? _instances
-					.Select(e => e.Reference)
-					.OfType<TI>()
-					.FirstOrDefault()
-				: default;
+		/// <summary>
+		/// First instance of the entry that implements <typeparamref name="TI"/>.
+		/// <para>
+		/// Written as a loop rather than <c>Select(e =&gt; e.Reference).OfType&lt;TI&gt;().FirstOrDefault()</c>:
+		/// the chain allocated a closure, two iterators and a buffer on every call, and the mod API getters
+		/// (<c>ControllerAPI</c>, <c>AvatarAPI</c>, <c>UserAPI</c>, …) look their instance up on every access —
+		/// several times per frame.
+		/// </para>
+		/// </summary>
+		public TI GetInstance<TI>() {
+			if (_instances == null)
+				return default;
 
-		public TI[] GetInstances<TI>()
-			=> _instances != null
-				? _instances
-					.Select(e => e.Reference)
-					.OfType<TI>()
-					.ToArray()
-				: Array.Empty<TI>();
+			for (var i = 0; i < _instances.Length; i++)
+				if (_instances[i].Reference is TI typed)
+					return typed;
+
+			return default;
+		}
+
+		public TI[] GetInstances<TI>() {
+			if (_instances == null)
+				return Array.Empty<TI>();
+
+			var found = new List<TI>();
+			for (var i = 0; i < _instances.Length; i++)
+				if (_instances[i].Reference is TI typed)
+					found.Add(typed);
+
+			return found.ToArray();
+		}
 
 		public void Disable() {
 			if (!_enabled) return;
@@ -387,7 +404,7 @@ namespace Nox.ModLoader.EntryPoints {
 
 			for (var i = 0; i < _instances.Length; i++) {
 				var instance = _instances[i].Reference;
-				profiler.Set("update", Name, i.ToString(), Profiler.At.Start, DateTime.UtcNow);
+				profiler.Set("update", Name, i, Profiler.At.Start);
 
 				try {
 					instance.OnUpdate();
@@ -407,7 +424,7 @@ namespace Nox.ModLoader.EntryPoints {
 					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to update mod {Mod.Metadata.GetId()}@{Mod.Metadata.GetVersion()}", e));
 				}
 
-				profiler.Set("update", Name, i.ToString(), Profiler.At.End, DateTime.UtcNow);
+				profiler.Set("update", Name, i, Profiler.At.End);
 			}
 
 			profiler.Set("update", Name, Profiler.At.End, DateTime.UtcNow);
@@ -422,7 +439,7 @@ namespace Nox.ModLoader.EntryPoints {
 
 			for (var i = 0; i < _instances.Length; i++) {
 				var instance = _instances[i].Reference;
-				profiler.Set("fixed_update", Name, i.ToString(), Profiler.At.Start, DateTime.UtcNow);
+				profiler.Set("fixed_update", Name, i, Profiler.At.Start);
 
 				try {
 					instance.OnFixedUpdate();
@@ -442,7 +459,7 @@ namespace Nox.ModLoader.EntryPoints {
 					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to fixed-update mod {Mod.Metadata.GetId()}@{Mod.Metadata.GetVersion()}", e));
 				}
 
-				profiler.Set("fixed_update", Name, i.ToString(), Profiler.At.End, DateTime.UtcNow);
+				profiler.Set("fixed_update", Name, i, Profiler.At.End);
 			}
 
 			profiler.Set("fixed_update", Name, Profiler.At.End, DateTime.UtcNow);
@@ -457,7 +474,7 @@ namespace Nox.ModLoader.EntryPoints {
 
 			for (var i = 0; i < _instances.Length; i++) {
 				var instance = _instances[i].Reference;
-				profiler.Set("late_update", Name, i.ToString(), Profiler.At.Start, DateTime.UtcNow);
+				profiler.Set("late_update", Name, i, Profiler.At.Start);
 
 				try {
 					instance.OnLateUpdate();
@@ -477,7 +494,7 @@ namespace Nox.ModLoader.EntryPoints {
 					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to late-update mod {Mod.Metadata.GetId()}@{Mod.Metadata.GetVersion()}", e));
 				}
 
-				profiler.Set("late_update", Name, i.ToString(), Profiler.At.End, DateTime.UtcNow);
+				profiler.Set("late_update", Name, i, Profiler.At.End);
 			}
 
 			profiler.Set("late_update", Name, Profiler.At.End, DateTime.UtcNow);
