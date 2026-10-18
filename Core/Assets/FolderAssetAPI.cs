@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using Nox.ModLoader.Mods;
 using Nox.CCK.Utils;
@@ -157,48 +158,52 @@ namespace Nox.ModLoader.Cores.Assets {
 
         #region Async Asset Methods
 
-        public async UniTask<bool> HasAssetAsync<T>(ResourceIdentifier path)
+        public async UniTask<bool> HasAssetAsync<T>(ResourceIdentifier path, CancellationToken cancellationToken = default)
             where T : UnityEngine.Object {
             path = AssetAPIExtension.Resolve(path, _mod);
-            if (await HasInternalAssetAsync<T>(path)) return true;
+            if (await HasInternalAssetAsync<T>(path, cancellationToken)) 
+                return true;
 
             // get on other mods
             foreach (var m in AssetAPIExtension.GetOtherLoadedMods(_mod, path.Namespace)) {
-                if (await m.AssetAPI.HasInternalAssetAsync<T>(path)) return true;
+                if (await m.AssetAPI.HasInternalAssetAsync<T>(path, cancellationToken)) 
+                    return true;
             }
 
             // get from the initial mod
             var mod = ModManager.GetMod(path.Namespace);
-            return mod != null && await mod.AssetAPI.HasInternalAssetAsync<T>(path);
+            return mod != null && await mod.AssetAPI.HasInternalAssetAsync<T>(path, cancellationToken);
         }
 
-        public async UniTask<T> GetAssetAsync<T>(ResourceIdentifier path)
+        public async UniTask<T> GetAssetAsync<T>(ResourceIdentifier path, CancellationToken cancellationToken = default)
             where T : UnityEngine.Object {
             path = AssetAPIExtension.Resolve(path, _mod);
             // get on Internal mod
-            if (await HasInternalAssetAsync<T>(path)) return await GetInternalAssetAsync<T>(path);
+            if (await HasInternalAssetAsync<T>(path, cancellationToken)) 
+                return await GetInternalAssetAsync<T>(path, cancellationToken);
 
             // get on other mods
             foreach (var m in AssetAPIExtension.GetOtherLoadedMods(_mod, path.Namespace)) {
-                if (await m.AssetAPI.HasInternalAssetAsync<T>(path)) return await m.AssetAPI.GetInternalAssetAsync<T>(path);
+                if (await m.AssetAPI.HasInternalAssetAsync<T>(path, cancellationToken)) 
+                    return await m.AssetAPI.GetInternalAssetAsync<T>(path, cancellationToken);
             }
 
             // get from the initial mod
             var mod = ModManager.GetMod(path.Namespace);
-            return mod != null ? await mod.AssetAPI.GetInternalAssetAsync<T>(path) : null;
+            return mod != null ? await mod.AssetAPI.GetInternalAssetAsync<T>(path, cancellationToken) : null;
         }
 
-        public async UniTask<bool> HasInternalAssetAsync<T>(ResourceIdentifier path)
+        public async UniTask<bool> HasInternalAssetAsync<T>(ResourceIdentifier path, CancellationToken cancellationToken = default)
             where T : UnityEngine.Object {
             path = AssetAPIExtension.Resolve(path, _mod);
-            await UniTask.Yield(); // Make it properly async
+            await UniTask.Yield(cancellationToken); // Make it properly async
             return HasInternalAsset<T>(path);
         }
 
-        public async UniTask<T> GetInternalAssetAsync<T>(ResourceIdentifier path)
+        public async UniTask<T> GetInternalAssetAsync<T>(ResourceIdentifier path, CancellationToken cancellationToken = default)
             where T : UnityEngine.Object {
             path = AssetAPIExtension.Resolve(path, _mod);
-            await UniTask.Yield(); // Make it properly async
+            await UniTask.Yield(cancellationToken); // Make it properly async
             return GetInternalAsset<T>(path);
         }
 
