@@ -45,8 +45,12 @@ namespace Nox.ModLoader.Cores.Assets {
 		/// <see cref="AssetDatabase.LoadAssetAtPath{T}"/> calls on the main thread, and a profiler
 		/// capture showed 13.5k <c>ReadObjectFromSerializedFile</c> and 3.8k
 		/// <c>PackageInfo.GetPackageByAssetPath</c> triggered by resolving the same paths over and over.
+		/// <para>
+		/// The key is a tuple: the previous <c>path + "|" + type</c> key built two strings on every
+		/// lookup, including the ones that hit the cache.
+		/// </para>
 		/// </summary>
-		private static readonly ConcurrentDictionary<string, AssetProbe> Probes = new();
+		private static readonly ConcurrentDictionary<(string path, string type), AssetProbe> Probes = new();
 
 		[InitializeOnLoadMethod]
 		private static void TrackAssetDatabase() {
@@ -67,7 +71,7 @@ namespace Nox.ModLoader.Cores.Assets {
 		/// </summary>
 		private static AssetProbe ProbeAsset<T>(string dirpath)
 			where T : Object {
-			var key = dirpath + "|" + typeof(T).Name;
+			var key = (dirpath, typeof(T).Name);
 			if (Probes.TryGetValue(key, out var cached)) {
 				if (cached.HasSymbolic || !cached.HasAsset || cached.Asset)
 					return cached;
@@ -99,7 +103,7 @@ namespace Nox.ModLoader.Cores.Assets {
 
 		private static (string abs, string rel)[] _folders;
 		public override string ToString() 
-			=> $"{GetType().Name}[Id={_kernelMod.Metadata.GetId()}, Version={_kernelMod.Metadata.GetVersion()}]";
+			=> $"{GetType().Name}[Id={_kernelMod.Metadata.Id}, Version={_kernelMod.Metadata.Version}]";
 
 		private static (string abs, string rel)[] GetFolders() {
 			if (_folders != null)
