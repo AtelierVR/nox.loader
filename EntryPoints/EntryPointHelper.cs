@@ -22,7 +22,7 @@ namespace Nox.ModLoader.EntryPoints {
 				var instance = (T)Activator.CreateInstance(type, true);
 
 				if (instance == null) {
-					Logger.LogError($"Failed to create instance of type {type.FullName} for entry point {entry.Name} in mod {entry.Mod.Metadata.GetId()}");
+					Logger.LogError($"Failed to create instance of type {type.FullName} for entry point {entry.Name} in mod {entry.Mod.Metadata.Id}");
 					continue;
 				}
 
@@ -33,7 +33,7 @@ namespace Nox.ModLoader.EntryPoints {
 		}
 
 		private static (string, Type)[] GetTypes<T>(this EntryPoint entry) where T : IModInitializer {
-			var entries = entry.Mod.Metadata.GetEntryPoints();
+			var entries = entry.Mod.Metadata.EntryPoints;
 
 			if (!entries.Has(entry.Name))
 				return Array.Empty<(string, Type)>();
@@ -56,9 +56,9 @@ namespace Nox.ModLoader.EntryPoints {
 					if (asm != null) {
 						foundType = asm.GetType(fullName); // O(1) dictionary lookup
 						if (foundType == null)
-							Logger.LogWarning($"Type {fullName} not found in assembly {element.Assembly} for entry point {entry.Name} in mod {entry.Mod.Metadata.GetId()}");
+							Logger.LogWarning($"Type {fullName} not found in assembly {element.Assembly} for entry point {entry.Name} in mod {entry.Mod.Metadata.Id}");
 					} else {
-						Logger.LogWarning($"Assembly {element.Assembly} not found for entry point {entry.Name} in mod {entry.Mod.Metadata.GetId()}");
+						Logger.LogWarning($"Assembly {element.Assembly} not found for entry point {entry.Name} in mod {entry.Mod.Metadata.Id}");
 					}
 				} else {
 					// Fallback: auto-discover using GetType() (O(1) per assembly)
@@ -72,13 +72,13 @@ namespace Nox.ModLoader.EntryPoints {
 					}
 
 					if (foundType == null)
-						Logger.LogWarning($"Could not find type {fullName} in mod {entry.Mod.Metadata.GetId()}");
+						Logger.LogWarning($"Could not find type {fullName} in mod {entry.Mod.Metadata.Id}");
 				}
 
 				if (foundType == null) continue;
 
 				if (foundType.GetInterface(t.FullName) == null) {
-					Logger.LogWarning($"Type {fullName} does not implement {t.FullName} in mod {entry.Mod.Metadata.GetId()}");
+					Logger.LogWarning($"Type {fullName} does not implement {t.FullName} in mod {entry.Mod.Metadata.Id}");
 					continue;
 				}
 

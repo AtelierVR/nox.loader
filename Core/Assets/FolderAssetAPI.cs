@@ -29,7 +29,7 @@ namespace Nox.ModLoader.Cores.Assets {
         }
 		
 		public override string ToString() 
-			=> $"{GetType().Name}[Id={_mod.Metadata.GetId()}, Version={_mod.Metadata.GetVersion()}]";
+			=> $"{GetType().Name}[Id={_mod.Metadata.Id}, Version={_mod.Metadata.Version}]";
 
 
         public bool IsLoaded() => _isLoaded;
@@ -68,7 +68,7 @@ namespace Nox.ModLoader.Cores.Assets {
                 _isLoaded = true;
                 return true;
             } catch (Exception ex) {
-                Logger.LogError($"Failed to register assets for mod {_mod.Metadata?.GetId()}: {ex.Message}");
+                Logger.LogError($"Failed to register assets for mod {_mod.Metadata?.Id}: {ex.Message}");
                 return false;
             }
         }
@@ -95,7 +95,7 @@ namespace Nox.ModLoader.Cores.Assets {
                 _isLoaded = false;
                 return true;
             } catch (Exception ex) {
-                Logger.LogError($"Failed to unregister assets for mod {_mod.Metadata?.GetId()}: {ex.Message}");
+                Logger.LogError($"Failed to unregister assets for mod {_mod.Metadata?.Id}: {ex.Message}");
                 return false;
             }
         }
@@ -135,7 +135,7 @@ namespace Nox.ModLoader.Cores.Assets {
         public bool HasInternalAsset<T>(ResourceIdentifier path)
             where T : UnityEngine.Object {
             path = AssetAPIExtension.Resolve(path, _mod);
-            if (_mod.Metadata?.GetId() != path.Namespace) return false;
+            if (_mod.Metadata?.Id != path.Namespace) return false;
 
             if (!_loadedAssets.TryGetValue(path.Path, out var asset)) return false;
             if (asset is T) return true;
@@ -146,7 +146,7 @@ namespace Nox.ModLoader.Cores.Assets {
         public T GetInternalAsset<T>(ResourceIdentifier path)
             where T : UnityEngine.Object {
             path = AssetAPIExtension.Resolve(path, _mod);
-            if (_mod.Metadata?.GetId() != path.Namespace) return null;
+            if (_mod.Metadata?.Id != path.Namespace) return null;
 
             if (!_loadedAssets.TryGetValue(path.Path, out var asset)) return null;
             if (asset is SymbolicAsset symbolic) return GetAsset<T>(symbolic.Target);
@@ -294,7 +294,7 @@ namespace Nox.ModLoader.Cores.Assets {
 
         public async UniTask<Scene> LoadInternalWorld(ResourceIdentifier path, LoadSceneMode mode = LoadSceneMode.Single) {
             path = AssetAPIExtension.Resolve(path, _mod);
-            if (_mod.Metadata?.GetId() != path.Namespace) return default;
+            if (_mod.Metadata?.Id != path.Namespace) return default;
 
             var name = path.Path;
             // Find the scene in loaded bundles
@@ -317,7 +317,7 @@ namespace Nox.ModLoader.Cores.Assets {
 
         public async UniTask UnloadInternalWorld(ResourceIdentifier path) {
             path = AssetAPIExtension.Resolve(path, _mod);
-            if (_mod.Metadata?.GetId() != path.Namespace) return;
+            if (_mod.Metadata?.Id != path.Namespace) return;
 
             var name = path.Path;
             if (!_loadedScenes.TryGetValue(name, out var scene)) return;
@@ -329,7 +329,7 @@ namespace Nox.ModLoader.Cores.Assets {
 
         public bool HasInternalWorld(ResourceIdentifier path) {
             path = AssetAPIExtension.Resolve(path, _mod);
-            if (_mod.Metadata?.GetId() != path.Namespace) return false;
+            if (_mod.Metadata?.Id != path.Namespace) return false;
 
             var name = path.Path;
             // Check if any loaded bundle contains the scene
@@ -345,7 +345,7 @@ namespace Nox.ModLoader.Cores.Assets {
 
         public bool IsLoadedInternalWorld(ResourceIdentifier path) {
             path = AssetAPIExtension.Resolve(path, _mod);
-            if (_mod.Metadata?.GetId() != path.Namespace) return false;
+            if (_mod.Metadata?.Id != path.Namespace) return false;
 
             var name = path.Path;
             return _loadedScenes.ContainsKey(name) && _loadedScenes[name].isLoaded;
@@ -353,7 +353,7 @@ namespace Nox.ModLoader.Cores.Assets {
 
         public Scene GetInternalWorld(ResourceIdentifier path) {
             path = AssetAPIExtension.Resolve(path, _mod);
-            if (_mod.Metadata?.GetId() != path.Namespace) return default;
+            if (_mod.Metadata?.Id != path.Namespace) return default;
 
             var name = path.Path;
             return _loadedScenes.TryGetValue(name, out var scene) ? scene : default;

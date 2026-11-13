@@ -66,7 +66,7 @@ namespace Nox.ModLoader.Discovers {
 
 			Logger.LogDebug("Found " + packages.Count + " folder mod(s):");
 			foreach (var package in packages)
-				Logger.LogDebug($" - {package.GetId()}");
+				Logger.LogDebug($" - {package.Id}");
 
 			return packages.ToArray();
 		}
@@ -80,7 +80,7 @@ namespace Nox.ModLoader.Discovers {
 					if (noxmod == null) continue;
 					var noxobj = ModMetadata.LoadFromPath(noxmod);
 					if (noxobj         == null) continue;
-					if (noxobj.GetId() != id) continue;
+					if (noxobj.Id != id) continue;
 					noxobj.InternalData["folder"] = pf;
 					noxobj.InternalDDiscover      = this;
 					return noxobj;
@@ -91,6 +91,6 @@ namespace Nox.ModLoader.Discovers {
 		}
 
 		public Mod CreateMod(ModMetadata metadata)
-			=> new FolderMod { Metadata = metadata };
+			=> new FolderMod { _metadata = metadata };
 	}
 }

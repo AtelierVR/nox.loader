@@ -28,7 +28,7 @@ namespace Nox.ModLoader.Loader {
 				Logger.LogDebug("Mod Loader is disabled in Editor mode. Skipping initialization.", tag: nameof(EditorLoader));
 				return;
 			}
-			
+
 			Logger.LogDebug("Initializing Mod Loader in Editor mode...", tag: nameof(EditorLoader));
 
 			Application.runInBackground = true;
@@ -52,7 +52,7 @@ namespace Nox.ModLoader.Loader {
 			// Unity ne déroule pas le démontage des mods avant un reload de domaine (recompile,
 			// entrée en Play mode) : on le fait nous-mêmes ici. Sans ça leurs ressources
 			// (sockets d'écoute, threads, handles) survivent au domaine et le domaine suivant
-			// les retrouve occupées — ex. « Une seule utilisation de chaque adresse de socket… ».
+			// les retrouve occupées — ex. « Une seule utilisation de chaque adresse de socket... ».
 			AssemblyReloadEvents.beforeAssemblyReload -= OnBeforeAssemblyReload;
 			AssemblyReloadEvents.beforeAssemblyReload += OnBeforeAssemblyReload;
 		}
@@ -144,13 +144,8 @@ namespace Nox.ModLoader.Loader {
 		/// </summary>
 		private static void OnBeforeAssemblyReload() {
 			Logger.LogDebug("Domain reload: disposing mods before the domain is torn down...", tag: nameof(EditorLoader));
-
-			// Avant tout démontage : termine les instantiations asynchrones en vol. Sinon leurs
-			// handles de script appartiennent au domaine sortant et l'intégration dans le domaine
-			// suivant casse le runtime (« Resolve of invalid GC handle. The handle is from a
-			// previous domain. » → crash natif dans AsyncInstantiateOperation::IntegrateInMainThread).
+			Logger.ClearProgress();
 			InstantiateHelper.CompletePendingInstantiations("assembly reload");
-
 			LoaderManager.DisposeSync("assembly reload");
 		}
 
@@ -184,7 +179,7 @@ namespace Nox.ModLoader.Loader {
 		#endregion
 
 		#region Startup Preferences
-		
+
 		public static bool LoaderDisabled {
 			get => Config.LoadEditor().Get("loader_disabled", false);
 			set {
@@ -193,7 +188,7 @@ namespace Nox.ModLoader.Loader {
 				config.Save();
 			}
 		}
-		
+
 		private const string LoaderMenuPath = "Nox/Loader/Enable";
 
 		[MenuItem(LoaderMenuPath, false)]
@@ -310,9 +305,9 @@ namespace Nox.ModLoader.Loader {
 
 				void Action(object[] obj) {
 					if (obj.Length > 0 && obj[0] is false) {
-						Logger.LogWarning($"Mod {mod.Metadata.GetId()}@{mod.Metadata.GetVersion()} blocked loading the game.");
+						Logger.LogWarning($"Mod {mod.Metadata.Id}@{mod.Metadata.Version} blocked loading the game.");
 						blockers.Add(mod);
-					} else Logger.LogWarning($"Mod {mod.Metadata.GetId()}@{mod.Metadata.GetVersion()} allowed loading the game. But is ignored.");
+					} else Logger.LogWarning($"Mod {mod.Metadata.Id}@{mod.Metadata.Version} allowed loading the game. But is ignored.");
 				}
 			}
 
@@ -321,7 +316,7 @@ namespace Nox.ModLoader.Loader {
 
 			Logger.LogWarning("Mod Loader will not load the game due to mod blockers:");
 			foreach (var mod in blockers)
-				Logger.LogWarning($" - {mod.Metadata.GetId()}@{mod.Metadata.GetVersion()}");
+				Logger.LogWarning($" - {mod.Metadata.Id}@{mod.Metadata.Version}");
 
 			switch (WantsTo) {
 				case WantsToLoad.Yes:
@@ -336,7 +331,7 @@ namespace Nox.ModLoader.Loader {
 						nameof(EditorLoader),
 						string.Join(
 							"",
-							$"Mod {blockers[0].Metadata.GetId()}@{blockers[0].Metadata.GetVersion()}",
+							$"Mod {blockers[0].Metadata.Id}@{blockers[0].Metadata.Version}",
 							$"{(blockers.Count > 1 ? $" and {blockers.Count - 1} other(s)" : "")}",
 							" blocked loading the game. Do you want to continue?"
 						),

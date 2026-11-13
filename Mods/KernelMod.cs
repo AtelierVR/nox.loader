@@ -13,10 +13,10 @@ namespace Nox.ModLoader.Mods {
 		internal Assembly[] Assemblies;
 		internal AppDomain Domain;
 
-		public override string GetModType()
+		public override string ModType
 			=> MOD_FOLDER_TYPE;
 
-		public override AppDomain GetAppDomain()
+		public override AppDomain AppDomain
 			=> Domain;
 
 		public override Assembly[] GetAssemblies()
@@ -24,25 +24,25 @@ namespace Nox.ModLoader.Mods {
 
 		internal KernelMod() {
 			CoreAPI = new CoreAPI(this);
-			#if UNITY_EDITOR
+#if UNITY_EDITOR
 			AssetAPI = new EditorKernelAssetAPI(this);
-			#else
+#else
             AssetAPI = new KernelAssetAPI(this);
-			#endif
+#endif
 		}
 
-		public override bool IsLoaded()
-			=> base.IsLoaded() && AssetAPI.IsLoaded();
+		public override bool IsLoaded
+			=> base.IsLoaded && AssetAPI.IsLoaded();
 
 		public override async UniTask<bool> Load() {
-			Logger.LogDebug($"Loading {Metadata.GetId()}@{Metadata.GetVersion()}");
+			Logger.LogDebug($"Loading {Metadata.Id}@{Metadata.Version}");
 
-			var reference = Metadata.GetReferences()
+			var reference = Metadata.References
 				.Where(i => i.IsCompatible());
 
 			// Resolve assemblies: use explicit assembly name from entrypoints when available,
 			// otherwise fall back to namespace-based discovery.
-			var assemblyNames = Metadata.GetEntryPoints().All.Values
+			var assemblyNames = Metadata.EntryPoints.All.Values
 				.SelectMany(e => e)
 				.Select(e => !string.IsNullOrEmpty(e.Assembly) ? e.Assembly : e.Namespace)
 				.Where(n => !string.IsNullOrEmpty(n))
@@ -58,22 +58,22 @@ namespace Nox.ModLoader.Mods {
 			if (!await AssetAPI.RegisterAssets())
 				return false;
 
-			#if UNITY_EDITOR
+#if UNITY_EDITOR
 			EditorGlobalAsset.Register(AssetAPI);
-			#endif
+#endif
 
 			return await base.Load();
 		}
 
 		public override async UniTask<bool> Unload() {
-			Logger.LogDebug($"Unloading {Metadata.GetId()}");
+			Logger.LogDebug($"Unloading {Metadata.Id}");
 
 			if (!await base.Unload())
 				return false;
 
-			#if UNITY_EDITOR
+#if UNITY_EDITOR
 			EditorGlobalAsset.Unregister(AssetAPI);
-			#endif
+#endif
 
 			return await AssetAPI.UnRegisterAssets();
 		}

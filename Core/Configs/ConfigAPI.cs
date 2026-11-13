@@ -9,7 +9,7 @@ namespace Nox.ModLoader.Cores.Configs {
 			=> _mod = mod;
 
 		public string GetFolder() {
-			var dir = Path.Combine(Constants.ConfigPath, _mod.Metadata.GetId());
+			var dir = Path.Combine(Constants.ConfigPath, _mod.Metadata.Id);
 			if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
 			return dir;
 		}

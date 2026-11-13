@@ -118,10 +118,8 @@ namespace Nox.ModLoader.Core.Libs {
 						+ (searchFolders.Length > 0 ? string.Join(", ", searchFolders) : "no folder") + ").");
 				}
 
-				// Physically load — set the DLL directory first so dependencies resolve
+				// Physically load the library, then remember the path it came from.
 				var fullPath = Path.GetFullPath(path);
-				var dir = Path.GetDirectoryName(fullPath);
-				IntPtr handle;
 
 #if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
 				// Unity usually resolves native plugins itself (see the .meta PluginImporter settings), so
@@ -129,11 +127,14 @@ namespace Nox.ModLoader.Core.Libs {
 				// disabled for this platform, or one shipped from a mod folder, which Unity never imports.
 				_libCache[name] = new LibEntry {
 					Handle = IntPtr.Zero, // resolved lazily by GetHandle
-					Path   = fullPath,
+					Path = fullPath,
 					ModIds = new HashSet<string> { modId },
 				};
 				return 1;
-#elif UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX
+#else
+				IntPtr handle;
+
+#if UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX
 				handle = dlopen(fullPath, RTLD_NOW);
 #elif UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
 				handle = dlopen(fullPath, RTLD_NOW);
@@ -141,18 +142,9 @@ namespace Nox.ModLoader.Core.Libs {
 				handle = new IntPtr(1);
 #endif
 
-				if (handle == IntPtr.Zero) {
-#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
-					int win32Err = Marshal.GetLastWin32Error();
-					throw new DllNotFoundException(
-						$"Failed to load native library '{name}' from {fullPath} " +
-						$"(error 0x{win32Err:X8}). The library may be missing dependencies " +
-						$"(e.g. Visual C++ Redistributable).");
-#else
+				if (handle == IntPtr.Zero)
 					throw new DllNotFoundException(
 						$"Failed to load native library '{name}' from {fullPath}: {LastNativeError()}");
-#endif
-				}
 
 				_libCache[name] = new LibEntry {
 					Handle = handle,
@@ -162,6 +154,7 @@ namespace Nox.ModLoader.Core.Libs {
 				};
 
 				return 1;
+#endif
 			}
 		}
 
@@ -223,8 +216,7 @@ namespace Nox.ModLoader.Core.Libs {
 		/// Checks that <paramref name="modId"/> has previously loaded <paramref name="name"/>
 		/// (whitelist) and returns its cached <c>LibEntry</c>. Throws if not whitelisted.
 		/// </summary>
-		private static LibEntry RequireLoaded(string name, string modId)
-		{
+		private static LibEntry RequireLoaded(string name, string modId) {
 			if (!_libCache.TryGetValue(name, out var entry) || !entry.ModIds.Contains(modId))
 				throw new InvalidOperationException(
 					$"Mod '{modId}' has not loaded native library '{name}'. " +
@@ -237,30 +229,25 @@ namespace Nox.ModLoader.Core.Libs {
 		/// <paramref name="modId"/> previously loaded it. On Windows the handle is resolved lazily and
 		/// cached, including a definitive failure (see <see cref="Load"/>).
 		/// </summary>
-		public static IntPtr GetHandle(string name, string modId)
-		{
-			lock (_lock)
-			{
+		public static IntPtr GetHandle(string name, string modId) {
+			lock (_lock) {
 				var entry = RequireLoaded(name, modId);
 
 #if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
 				// Cache the resolved module handle (GetModuleHandle is cheap but repeated calls
 				// across every symbol resolution are wasteful).
-				if (entry.Handle == IntPtr.Zero && !entry.Failed)
-				{
+				if (entry.Handle == IntPtr.Zero && !entry.Failed) {
 					var moduleName = name + GetExtension();
 					entry.Handle = GetModuleHandle(moduleName);
 
 					// Not in the process: load it ourselves from the path resolved by Load().
 					// LOAD_WITH_ALTERED_SEARCH_PATH makes the library's own directory the search root, so
 					// sibling dependencies resolve even though only its full path is known.
-					if (entry.Handle == IntPtr.Zero && !string.IsNullOrEmpty(entry.Path))
-					{
+					if (entry.Handle == IntPtr.Zero && !string.IsNullOrEmpty(entry.Path)) {
 						entry.Handle = LoadLibraryEx(entry.Path, IntPtr.Zero, LOAD_WITH_ALTERED_SEARCH_PATH);
-						entry.Owned  = entry.Handle != IntPtr.Zero;
+						entry.Owned = entry.Handle != IntPtr.Zero;
 
-						if (entry.Handle == IntPtr.Zero)
-						{
+						if (entry.Handle == IntPtr.Zero) {
 							entry.Failed = true;
 							var win32Err = Marshal.GetLastWin32Error();
 							Logger.LogError(
@@ -281,8 +268,7 @@ namespace Nox.ModLoader.Core.Libs {
 		/// Resolves the address of the native export <paramref name="symbol"/> from a library
 		/// that <paramref name="modId"/> has previously loaded (whitelist).
 		/// </summary>
-		public static IntPtr GetSymbol(string name, string symbol, string modId)
-		{
+		public static IntPtr GetSymbol(string name, string symbol, string modId) {
 			var handle = GetHandle(name, modId);
 			if (handle == IntPtr.Zero)
 				return IntPtr.Zero;
@@ -303,8 +289,7 @@ namespace Nox.ModLoader.Core.Libs {
 		/// must have been previously loaded by <paramref name="modId"/> (whitelist).
 		/// </summary>
 		public static T GetDelegate<T>(string name, string symbol, string modId)
-			where T : Delegate
-		{
+			where T : Delegate {
 			var ptr = GetSymbol(name, symbol, modId);
 			if (ptr == IntPtr.Zero)
 				throw new EntryPointNotFoundException(
@@ -318,7 +303,7 @@ namespace Nox.ModLoader.Core.Libs {
 		/// </summary>
 		internal static string[] GetLibraries(string modId) {
 			var result = new List<string>();
-			foreach (var kv in _libCache) 
+			foreach (var kv in _libCache)
 				if (kv.Value.ModIds.Contains(modId))
 					result.Add(kv.Key);
 			return result.ToArray();
@@ -340,7 +325,7 @@ namespace Nox.ModLoader.Core.Libs {
 		/// Returns the prioritized list of plugin sub-paths (relative to the <c>Plugins</c> root)
 		/// where a native binary may live, ordered from most specific to least:
 		/// <c>&lt;platform&gt;/&lt;arch&gt;</c> (e.g. <c>windows/x64</c>), <c>&lt;platform&gt;</c>
-		/// (e.g. <c>windows</c>), the <c>&lt;arch&gt;</c> folder of a player build (<c>x64</c>, …)
+		/// (e.g. <c>windows</c>), the <c>&lt;arch&gt;</c> folder of a player build (<c>x64</c>, ...)
 		/// and finally <c>""</c> (the root itself).
 		/// Example on Windows x64: <c>["windows/x64", "windows", "x64", ""]</c>.
 		/// Delegates to <see cref="Library.CurrentPluginSubFolders"/>.

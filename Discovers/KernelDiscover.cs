@@ -48,7 +48,7 @@ namespace Nox.ModLoader.Discovers {
 
 			Logger.LogDebug("Found " + packages.Count + " kernel mod(s):");
 			foreach (var package in packages)
-				Logger.LogDebug(" - " + package.GetId());
+				Logger.LogDebug(" - " + package.Id);
 
 			return packages.ToArray();
 			#else
@@ -117,7 +117,7 @@ namespace Nox.ModLoader.Discovers {
 					var noxobj = ModMetadata.LoadFromPath(noxmod);
 					if (noxobj == null)
 						continue;
-					if (noxobj.GetId() != id && !(noxobj.GetProvides()?.Contains(id) ?? false))
+					if (noxobj.Id != id && !(noxobj.Provides?.Contains(id) ?? false))
 						continue;
 					var folder                     = Path.GetDirectoryName(noxmod) ?? string.Empty;
 					noxobj.InternalData["folder"] = folder;
@@ -131,6 +131,6 @@ namespace Nox.ModLoader.Discovers {
 		}
 
 		public Mod CreateMod(ModMetadata metadata)
-			=> new KernelMod() { Metadata = metadata };
+			=> new KernelMod { _metadata = metadata };
 	}
 }

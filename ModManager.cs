@@ -39,14 +39,24 @@ namespace Nox.ModLoader {
 		public static IReadOnlyList<Mod> GetMods()
 			=> Mods ?? (IReadOnlyList<Mod>)Array.Empty<Mod>();
 
-		public static Mod GetMod(string id)
-			=> Mods?.Find(x => x.GetMetadata().Match(id));
+		public static Mod GetMod(string id) {
+			if (string.IsNullOrEmpty(id) || Mods == null)
+				return null;
+
+			for (var i = 0; i < Mods.Count; i++) {
+				var metadata = Mods[i].Metadata;
+				if (metadata != null && metadata.Match(id))
+					return Mods[i];
+			}
+
+			return null;
+		}
 
 		/// <summary>
 		/// Checks if a mod is currently loaded.
 		/// </summary>
 		public static bool IsModLoaded(string id)
-			=> GetMod(id)?.IsLoaded() ?? false;
+			=> GetMod(id)?.IsLoaded ?? false;
 
 		public static UniTask<ResultLoadInfos> LoadMods(string[] ids)
 			=> LoadMods(ids, GlobalDiscover.Instance);
@@ -61,7 +71,7 @@ namespace Nox.ModLoader {
 
 			foreach (var package in discover.FindAllPackages()) {
 				mods.Add(package.InternalDDiscover.CreateMod(package));
-				Logger.LogDebug($"{package.GetId()}@{package.GetVersion()} found by discover {discover.GetType().Name}", tag: nameof(ModManager));
+				Logger.LogDebug($"{package.Id}@{package.Version} found by discover {discover.GetType().Name}", tag: nameof(ModManager));
 			}
 
 			return await PrepareMods(mods.ToArray());
@@ -78,7 +88,7 @@ namespace Nox.ModLoader {
 			);
 
 		private static ResultLoad[] CheckModHaveMissingDependencies(Mod mod, Mod[] mods) {
-			var metadata = mod.GetMetadata();
+			var metadata = mod.Metadata;
 			if (metadata == null)
 				return new[] {
 					new ResultLoad {
@@ -92,15 +102,15 @@ namespace Nox.ModLoader {
 			allMods.AddRange(Mods);
 			allMods.AddRange(mods);
 
-			foreach (var dependency in metadata.GetDepends()) {
-				var isDepend = allMods.Any(currentMod => currentMod.GetMetadata().Match(dependency));
+			foreach (var dependency in metadata.Depends) {
+				var isDepend = allMods.Any(currentMod => currentMod.Metadata.Match(dependency));
 
 				if (!isDepend)
 					results.Add(
 						new ResultLoad {
 							Type     = ResultLoad.ResultType.MissingDependency,
-							Message  = $"Missing dependency {dependency.GetId()}@{dependency.GetVersion()} for {metadata.GetId()}@{metadata.GetVersion()}",
-							CausedBy = metadata.GetId(),
+							Message  = $"Missing dependency {dependency.GetId()}@{dependency.GetVersion()} for {metadata.Id}@{metadata.Version}",
+							CausedBy = metadata.Id,
 							ForMod   = dependency.GetId()
 						}
 					);
@@ -111,7 +121,7 @@ namespace Nox.ModLoader {
 
 		// Check if mod breaks other mods, if have any mod that breaks, don't load the mod
 		private static ResultLoad[] CheckModBreakOtherMod(Mod mod, Mod[] mods) {
-			var metadata = mod.GetMetadata();
+			var metadata = mod.Metadata;
 			if (metadata == null)
 				return new[] {
 					new ResultLoad {
@@ -124,14 +134,14 @@ namespace Nox.ModLoader {
 			allMods.AddRange(Mods);
 			allMods.AddRange(mods);
 
-			return (from dependency in metadata.GetBreaks()
+			return (from dependency in metadata.Breaks
 					from currentMod in allMods
-					where currentMod.GetMetadata().Match(dependency)
+					where currentMod.Metadata.Match(dependency)
 					select new ResultLoad {
 						Type = ResultLoad.ResultType.MissingDependency,
 						Message =
-							$"Mod {metadata.GetId()}@{metadata.GetVersion()} breaks {dependency.GetId()}@{dependency.GetVersion()}",
-						CausedBy = metadata.GetId(),
+							$"Mod {metadata.Id}@{metadata.Version} breaks {dependency.GetId()}@{dependency.GetVersion()}",
+						CausedBy = metadata.Id,
 						ForMod   = dependency.GetId()
 					})
 				.ToArray();
@@ -139,7 +149,7 @@ namespace Nox.ModLoader {
 
 		// Check if mod conflicts with other mods, if have any mod that conflicts, you can load the mod but show a warning
 		private static ResultLoad[] CheckModConflictOtherMod(Mod mod, Mod[] mods) {
-			var metadata = mod.GetMetadata();
+			var metadata = mod.Metadata;
 			if (metadata == null)
 				return new[] {
 					new ResultLoad {
@@ -152,32 +162,32 @@ namespace Nox.ModLoader {
 			allMods.AddRange(Mods);
 			allMods.AddRange(mods);
 
-			return (from dependency in metadata.GetConflicts()
+			return (from dependency in metadata.Conflicts
 					from currentMod in allMods
-					where currentMod.GetMetadata().Match(dependency)
+					where currentMod.Metadata.Match(dependency)
 					select new ResultLoad {
 						Type = ResultLoad.ResultType.MissingDependency,
 						Message =
-							$"Mod {metadata.GetId()}@{metadata.GetVersion()} conflicts with {dependency.GetId()}@{dependency.GetVersion()}",
-						CausedBy = metadata.GetId(),
+							$"Mod {metadata.Id}@{metadata.Version} conflicts with {dependency.GetId()}@{dependency.GetVersion()}",
+						CausedBy = metadata.Id,
 						ForMod   = dependency.GetId()
 					})
 				.ToArray();
 		}
 
 		private static ResultLoad CheckModIsAlreadyLoaded(Mod mod) {
-			var metadata = mod.GetMetadata();
+			var metadata = mod.Metadata;
 			if (metadata == null)
 				return new ResultLoad {
 					Type   = ResultLoad.ResultType.NoMetadata,
 					ForMod = "<unknown>"
 				};
 
-			if (Mods.Any(currentMod => currentMod.GetMetadata().Match(metadata)))
+			if (Mods.Any(currentMod => currentMod.Metadata.Match(metadata)))
 				return new ResultLoad {
 					Type    = ResultLoad.ResultType.AlreadyLoaded,
-					Message = $"Mod {metadata.GetId()}@{metadata.GetVersion()} is already loaded",
-					ForMod  = metadata.GetId()
+					Message = $"Mod {metadata.Id}@{metadata.Version} is already loaded",
+					ForMod  = metadata.Id
 				};
 
 			return null;
@@ -197,7 +207,7 @@ namespace Nox.ModLoader {
 
 			// Initialize
 			foreach (var mod in mods) {
-				var modId = mod.GetMetadata()?.GetId();
+				var modId = mod.Metadata?.Id;
 				if (modId == null)
 					continue;
 
@@ -207,11 +217,11 @@ namespace Nox.ModLoader {
 
 			// Build the graph: only use constraints (not dependencies) for ordering
 			foreach (var mod in mods) {
-				var modId = mod.GetMetadata()?.GetId();
+				var modId = mod.Metadata?.Id;
 				if (modId == null)
 					continue;
 
-				var metadata = mod.GetMetadata();
+				var metadata = mod.Metadata;
 
 				// Process load order constraints ONLY
 				var constraints = (metadata as Typing.ModMetadata)?.GetConstraints() ?? Array.Empty<Typing.LoadConstraint>();
@@ -221,10 +231,10 @@ namespace Nox.ModLoader {
 							// This mod must come BEFORE the target mod
 							// Add edge: this mod -> target mod
 							if (!string.IsNullOrEmpty(constraint.TargetModId)) {
-								var beforeTarget = mods.FirstOrDefault(m => m.GetMetadata()?.Match(constraint.TargetModId) == true);
+								var beforeTarget = mods.FirstOrDefault(m => m.Metadata?.Match(constraint.TargetModId) == true);
 								if (beforeTarget != null) {
 									adjacencyList[modId].Add(beforeTarget);
-									var targetId = beforeTarget.GetMetadata()?.GetId();
+									var targetId = beforeTarget.Metadata?.Id;
 									if (targetId != null)
 										inDegree[targetId]++;
 								}
@@ -235,8 +245,8 @@ namespace Nox.ModLoader {
 							// This mod must come AFTER the target mod
 							// Add edge: target mod -> this mod
 							if (!string.IsNullOrEmpty(constraint.TargetModId)) {
-								var afterTarget = mods.FirstOrDefault(m => m.GetMetadata()?.Match(constraint.TargetModId) == true);
-								var targetId    = afterTarget?.GetMetadata()?.GetId();
+								var afterTarget = mods.FirstOrDefault(m => m.Metadata?.Match(constraint.TargetModId) == true);
+								var targetId    = afterTarget?.Metadata?.Id;
 								if (targetId != null) {
 									adjacencyList[targetId].Add(mod);
 									inDegree[modId]++;
@@ -252,7 +262,7 @@ namespace Nox.ModLoader {
 			// Kahn's algorithm: start with nodes that have no dependencies
 			var queue = new Queue<Mod>();
 			foreach (var mod in mods) {
-				var modId = mod.GetMetadata()?.GetId();
+				var modId = mod.Metadata?.Id;
 				if (modId != null && inDegree[modId] == 0)
 					queue.Enqueue(mod);
 			}
@@ -264,13 +274,13 @@ namespace Nox.ModLoader {
 				var mod = queue.Dequeue();
 				sortedMods.Add(mod);
 
-				var modId = mod.GetMetadata()?.GetId();
+				var modId = mod.Metadata?.Id;
 				if (modId == null)
 					continue;
 
 				// For each dependent of this mod
 				foreach (var dependent in adjacencyList[modId]) {
-					var depId = dependent.GetMetadata()?.GetId();
+					var depId = dependent.Metadata?.Id;
 					if (depId == null)
 						continue;
 
@@ -288,7 +298,7 @@ namespace Nox.ModLoader {
 				// Find the problematic mods (those still with in-degree > 0)
 				var problematicMods = mods
 					.Where(m => {
-						var id = m.GetMetadata()?.GetId();
+						var id = m.Metadata?.Id;
 						return id != null && !sortedMods.Contains(m);
 					})
 					.ToList();
@@ -303,7 +313,7 @@ namespace Nox.ModLoader {
 							Logger.LogWarning($"  Cycle #{i + 1}: {cycles[i]}");
 						}
 					} else {
-						Logger.LogWarning($"Circular dependency detected involving: {string.Join(", ", problematicMods.Select(m => m.GetMetadata()?.GetId()))}");
+						Logger.LogWarning($"Circular dependency detected involving: {string.Join(", ", problematicMods.Select(m => m.Metadata?.Id))}");
 					}
 				} else {
 					Logger.LogWarning("Possible circular dependency detected in mod constraints");
@@ -339,7 +349,7 @@ namespace Nox.ModLoader {
 			var currentPath    = new List<string>();
 
 			foreach (var mod in problematicMods) {
-				var modId = mod.GetMetadata()?.GetId();
+				var modId = mod.Metadata?.Id;
 				if (modId == null || visited.Contains(modId))
 					continue;
 
@@ -369,7 +379,7 @@ namespace Nox.ModLoader {
 
 			if (adjacencyList.TryGetValue(currentId, out var neighbors)) {
 				foreach (var neighbor in neighbors) {
-					var neighborId = neighbor.GetMetadata()?.GetId();
+					var neighborId = neighbor.Metadata?.Id;
 					if (neighborId == null)
 						continue;
 
@@ -426,12 +436,12 @@ namespace Nox.ModLoader {
 			var normalMods = new List<Mod>();
 
 			foreach (var mod in sortedMods) {
-				var constraints = (mod.GetMetadata() as Typing.ModMetadata)?.GetConstraints() ?? Array.Empty<Typing.LoadConstraint>();
+				var constraints = (mod.Metadata as Typing.ModMetadata)?.GetConstraints() ?? Array.Empty<Typing.LoadConstraint>();
 				var hasFirst    = constraints.Any(c => c.Type == Typing.LoadConstraintType.First);
 				var hasLast     = constraints.Any(c => c.Type == Typing.LoadConstraintType.Last);
 
 				if (hasFirst && hasLast) {
-					Logger.LogWarning($"Mod {mod.GetMetadata()?.GetId()} has both 'first' and 'last' constraints, ignoring both");
+					Logger.LogWarning($"Mod {mod.Metadata?.Id} has both 'first' and 'last' constraints, ignoring both");
 					normalMods.Add(mod);
 				} else if (hasFirst) {
 					firstMods.Add(mod);
@@ -496,7 +506,7 @@ namespace Nox.ModLoader {
 			List<Mod> loadedMods = new();
 
 			foreach (var mod in verifiedMods) {
-				if (mod.IsLoaded()) {
+				if (mod.IsLoaded) {
 					loadedMods.Add(mod);
 					continue;
 				}
@@ -505,8 +515,8 @@ namespace Nox.ModLoader {
 					results.Add(
 						new ResultLoad {
 							Type    = ResultLoad.ResultType.LoadError,
-							Message = $"Failed to load mod {mod.GetMetadata().GetId()}({mod.GetMetadata().GetVersion()})",
-							ForMod  = mod.GetMetadata().GetId()
+							Message = $"Failed to load mod {mod.Metadata.Id}({mod.Metadata.Version})",
+							ForMod  = mod.Metadata.Id
 						}
 					);
 				else
@@ -530,8 +540,8 @@ namespace Nox.ModLoader {
 				loadedMods.Select(
 					mod => new ResultLoad {
 						Type    = ResultLoad.ResultType.Success,
-						Message = $"Mod {mod.GetMetadata().GetId()}({mod.GetMetadata().GetVersion()}) loaded successfully",
-						ForMod  = mod.GetMetadata().GetId()
+						Message = $"Mod {mod.Metadata.Id}({mod.Metadata.Version}) loaded successfully",
+						ForMod  = mod.Metadata.Id
 					}
 				)
 			);
@@ -574,7 +584,7 @@ namespace Nox.ModLoader {
 		/// <returns>Result of the unload operation</returns>
 		public static async UniTask<ResultUnloadInfos> UnloadMod(Mod mod) {
 			var results = new List<ResultUnload>();
-			var modId   = mod.GetMetadata()?.GetId() ?? "<unknown>";
+			var modId   = mod.Metadata?.Id ?? "<unknown>";
 
 			// Check for dependents - mods that depend on this mod
 			var dependents = GetModsDependingOn(mod);
@@ -587,7 +597,7 @@ namespace Nox.ModLoader {
 					if (!depResult.Success) {
 						results.Add(new ResultUnload {
 							Type    = ResultUnload.ResultType.DependentUnloadFailed,
-							Message = $"Failed to unload dependent mod '{dependent.GetMetadata().GetId()}'",
+							Message = $"Failed to unload dependent mod '{dependent.Metadata.Id}'",
 							ForMod  = modId
 						});
 						return new ResultUnloadInfos { Success = false, Results = results.ToArray() };
@@ -695,7 +705,7 @@ namespace Nox.ModLoader {
 				return false;
 			}
 
-			var discover = mod.Metadata?.InternalDDiscover;
+			var discover = mod._metadata?.InternalDDiscover;
 			if (discover == null) {
 				Logger.LogError($"Cannot reload mod '{modId}' - no discover found");
 				return false;
@@ -729,12 +739,12 @@ namespace Nox.ModLoader {
 		/// Gets all mods that depend on the specified mod.
 		/// </summary>
 		private static Mod[] GetModsDependingOn(Mod mod) {
-			var modMetadata = mod.GetMetadata();
+			var modMetadata = mod.Metadata;
 			if (modMetadata == null)
 				return Array.Empty<Mod>();
 
 			return Mods
-				.Where(m => m != mod && m.GetMetadata()?.GetDepends()
+				.Where(m => m != mod && m.Metadata?.Depends
 					.Any(dep => modMetadata.Match(dep)) == true)
 				.ToArray();
 		}
@@ -757,14 +767,14 @@ namespace Nox.ModLoader {
 			return sorted;
 
 			void Visit(Mod mod) {
-				var id = mod.GetMetadata()?.GetId();
+				var id = mod.Metadata?.Id;
 				if (id == null || !visited.Add(id))
 					return;
 
 				// Visit dependencies first
-				var deps = mod.GetMetadata()?.GetDepends() ?? Array.Empty<IRelation>();
+				var deps = mod.Metadata?.Depends ?? Array.Empty<IRelation>();
 				foreach (var dep in deps) {
-					var depMod = mods.Find(m => m.GetMetadata()?.Match(dep) == true);
+					var depMod = mods.Find(m => m.Metadata?.Match(dep) == true);
 					if (depMod != null)
 						Visit(depMod);
 				}

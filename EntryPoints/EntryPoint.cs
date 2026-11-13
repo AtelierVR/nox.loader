@@ -34,7 +34,7 @@ namespace Nox.ModLoader.EntryPoints {
 		/// <para>
 		/// Written as a loop rather than <c>Select(e =&gt; e.Reference).OfType&lt;TI&gt;().FirstOrDefault()</c>:
 		/// the chain allocated a closure, two iterators and a buffer on every call, and the mod API getters
-		/// (<c>ControllerAPI</c>, <c>AvatarAPI</c>, <c>UserAPI</c>, …) look their instance up on every access —
+		/// (<c>ControllerAPI</c>, <c>AvatarAPI</c>, <c>UserAPI</c>, ...) look their instance up on every access —
 		/// several times per frame.
 		/// </para>
 		/// </summary>
@@ -101,7 +101,7 @@ namespace Nox.ModLoader.EntryPoints {
 				return;
 
 			var eventCtx = Mod.CoreAPI.EventAPI;
-			var profiler = Mod.Profiler;
+			var profiler = Mod._profiler;
 			_state = InitializerState.Initialized;
 
 			eventCtx.Emit(new ModEventContext("mod_initialize", Mod, Name, ExecutionEventStatus.Pre));
@@ -139,7 +139,7 @@ namespace Nox.ModLoader.EntryPoints {
 
 					eventCtx.Emit("mod_initialize", Mod, Name, ExecutionEventStatus.Success, instance);
 				} catch (Exception e) {
-					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to initialize mod {Mod.Metadata.GetId()}@{Mod.Metadata.GetVersion()}", e));
+					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to initialize mod {Mod.Metadata.Id}@{Mod.Metadata.Version}", e));
 					eventCtx.Emit("mod_initialize", Mod, Name, ExecutionEventStatus.Error, instance, e);
 				}
 
@@ -155,7 +155,7 @@ namespace Nox.ModLoader.EntryPoints {
 			_state = InitializerState.PostInitialized;
 
 			var eventCtx = Mod.CoreAPI.EventAPI;
-			var profiler = Mod.Profiler;
+			var profiler = Mod._profiler;
 			eventCtx.Emit(new ModEventContext("mod_post_initialize", Mod, Name, ExecutionEventStatus.Pre));
 			profiler.Set("post_initialize", Name, Profiler.At.Start, DateTime.UtcNow);
 
@@ -191,7 +191,7 @@ namespace Nox.ModLoader.EntryPoints {
 
 					eventCtx.Emit("mod_post_initialize", Mod, Name, ExecutionEventStatus.Success, instance);
 				} catch (Exception e) {
-					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to post-initialize mod {Mod.Metadata.GetId()}@{Mod.Metadata.GetVersion()}", e));
+					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to post-initialize mod {Mod.Metadata.Id}@{Mod.Metadata.Version}", e));
 					eventCtx.Emit("mod_post_initialize", Mod, Name, ExecutionEventStatus.Error, instance, e);
 				}
 
@@ -207,7 +207,7 @@ namespace Nox.ModLoader.EntryPoints {
 				return;
 			_state = InitializerState.PreDisposed;
 			var eventCtx = Mod.CoreAPI.EventAPI;
-			var profiler = Mod.Profiler;
+			var profiler = Mod._profiler;
 
 			eventCtx.Emit(new ModEventContext("mod_pre_dispose", Mod, Name, ExecutionEventStatus.Pre));
 			profiler.Set("pre_dispose", Name, Profiler.At.Start, DateTime.UtcNow);
@@ -244,7 +244,7 @@ namespace Nox.ModLoader.EntryPoints {
 
 					eventCtx.Emit("mod_pre_dispose", Mod, Name, ExecutionEventStatus.Success, instance);
 				} catch (Exception e) {
-					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to pre-dispose mod {Mod.Metadata.GetId()}@{Mod.Metadata.GetVersion()}", e));
+					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to pre-dispose mod {Mod.Metadata.Id}@{Mod.Metadata.Version}", e));
 					eventCtx.Emit("mod_pre_dispose", Mod, Name, ExecutionEventStatus.Error, instance, e);
 				}
 
@@ -261,7 +261,7 @@ namespace Nox.ModLoader.EntryPoints {
 				return;
 			_state = InitializerState.Disposed;
 			var eventCtx = Mod.CoreAPI.EventAPI;
-			var profiler = Mod.Profiler;
+			var profiler = Mod._profiler;
 
 			eventCtx.Emit(new ModEventContext("mod_dispose", Mod, Name, ExecutionEventStatus.Pre));
 			profiler.Set("dispose", Name, Profiler.At.Start, DateTime.UtcNow);
@@ -298,7 +298,7 @@ namespace Nox.ModLoader.EntryPoints {
 
 					eventCtx.Emit("mod_dispose", Mod, Name, ExecutionEventStatus.Success, instance);
 				} catch (Exception e) {
-					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to dispose mod {Mod.Metadata.GetId()}@{Mod.Metadata.GetVersion()}", e));
+					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to dispose mod {Mod.Metadata.Id}@{Mod.Metadata.Version}", e));
 					eventCtx.Emit("mod_dispose", Mod, Name, ExecutionEventStatus.Error, instance, e);
 				}
 
@@ -347,7 +347,7 @@ namespace Nox.ModLoader.EntryPoints {
 					instance.OnPreDispose();
 					WaitSync(instance.OnPreDisposeAsync(), nameof(instance.OnPreDisposeAsync));
 				} catch (Exception e) {
-					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to pre-dispose mod {Mod.Metadata.GetId()}@{Mod.Metadata.GetVersion()}", e));
+					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to pre-dispose mod {Mod.Metadata.Id}@{Mod.Metadata.Version}", e));
 				}
 			}
 		}
@@ -383,7 +383,7 @@ namespace Nox.ModLoader.EntryPoints {
 					instance.OnDispose();
 					WaitSync(instance.OnDisposeAsync(), nameof(instance.OnDisposeAsync));
 				} catch (Exception e) {
-					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to dispose mod {Mod.Metadata.GetId()}@{Mod.Metadata.GetVersion()}", e));
+					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to dispose mod {Mod.Metadata.Id}@{Mod.Metadata.Version}", e));
 				}
 			}
 		}
@@ -393,13 +393,13 @@ namespace Nox.ModLoader.EntryPoints {
 		/// (voir <see cref="LoaderManager.WaitSync"/>).
 		/// </summary>
 		private void WaitSync(UniTask task, string callback)
-			=> LoaderManager.WaitSync(task, $"{Mod.Metadata.GetId()}@{Name}.{callback}");
+			=> LoaderManager.WaitSync(task, $"{Mod.Metadata.Id}@{Name}.{callback}");
 
 		public void OnUpdate() {
 			if (!IsEnabled() || _state != InitializerState.PostInitialized || !HasUpdate)
 				return;
 
-			var profiler = Mod.Profiler;
+			var profiler = Mod._profiler;
 			profiler.Set("update", Name, Profiler.At.Start, DateTime.UtcNow);
 
 			for (var i = 0; i < _instances.Length; i++) {
@@ -421,7 +421,7 @@ namespace Nox.ModLoader.EntryPoints {
 					if (instance is IClientModInitializer c)
 						c.OnUpdateClient();
 				} catch (Exception e) {
-					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to update mod {Mod.Metadata.GetId()}@{Mod.Metadata.GetVersion()}", e));
+					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to update mod {Mod.Metadata.Id}@{Mod.Metadata.Version}", e));
 				}
 
 				profiler.Set("update", Name, i, Profiler.At.End);
@@ -434,7 +434,7 @@ namespace Nox.ModLoader.EntryPoints {
 			if (!IsEnabled() || _state != InitializerState.PostInitialized || !HasFixedUpdate)
 				return;
 
-			var profiler = Mod.Profiler;
+			var profiler = Mod._profiler;
 			profiler.Set("fixed_update", Name, Profiler.At.Start, DateTime.UtcNow);
 
 			for (var i = 0; i < _instances.Length; i++) {
@@ -456,7 +456,7 @@ namespace Nox.ModLoader.EntryPoints {
 					if (instance is IClientModInitializer c)
 						c.OnFixedUpdateClient();
 				} catch (Exception e) {
-					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to fixed-update mod {Mod.Metadata.GetId()}@{Mod.Metadata.GetVersion()}", e));
+					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to fixed-update mod {Mod.Metadata.Id}@{Mod.Metadata.Version}", e));
 				}
 
 				profiler.Set("fixed_update", Name, i, Profiler.At.End);
@@ -469,7 +469,7 @@ namespace Nox.ModLoader.EntryPoints {
 			if (!IsEnabled() || _state != InitializerState.PostInitialized || !HasLateUpdate)
 				return;
 
-			var profiler = Mod.Profiler;
+			var profiler = Mod._profiler;
 			profiler.Set("late_update", Name, Profiler.At.Start, DateTime.UtcNow);
 
 			for (var i = 0; i < _instances.Length; i++) {
@@ -491,7 +491,7 @@ namespace Nox.ModLoader.EntryPoints {
 					if (instance is IClientModInitializer c)
 						c.OnLateUpdateClient();
 				} catch (Exception e) {
-					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to late-update mod {Mod.Metadata.GetId()}@{Mod.Metadata.GetVersion()}", e));
+					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to late-update mod {Mod.Metadata.Id}@{Mod.Metadata.Version}", e));
 				}
 
 				profiler.Set("late_update", Name, i, Profiler.At.End);
@@ -505,7 +505,7 @@ namespace Nox.ModLoader.EntryPoints {
 			if (!IsEnabled() || _state != InitializerState.PostInitialized)
 				return;
 
-			var profiler = Mod.Profiler;
+			var profiler = Mod._profiler;
 			profiler.Set("enter_play_mode", Name, Profiler.At.Start, DateTime.UtcNow);
 
 			for (var i = 0; i < _instances.Length; i++) {
@@ -516,7 +516,7 @@ namespace Nox.ModLoader.EntryPoints {
 					if (instance is IMainModInitializer m)
 						m.OnEnterPlayMode();
 				} catch (Exception e) {
-					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to enter play mode for mod {Mod.Metadata.GetId()}@{Mod.Metadata.GetVersion()}", e));
+					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to enter play mode for mod {Mod.Metadata.Id}@{Mod.Metadata.Version}", e));
 				}
 
 				profiler.Set("enter_play_mode", Name, i.ToString(), Profiler.At.End, DateTime.UtcNow);
@@ -529,7 +529,7 @@ namespace Nox.ModLoader.EntryPoints {
 			if (!IsEnabled() || _state != InitializerState.PostInitialized)
 				return;
 
-			var profiler = Mod.Profiler;
+			var profiler = Mod._profiler;
 			profiler.Set("exit_play_mode", Name, Profiler.At.Start, DateTime.UtcNow);
 
 			for (var i = 0; i < _instances.Length; i++) {
@@ -540,7 +540,7 @@ namespace Nox.ModLoader.EntryPoints {
 					if (instance is IMainModInitializer m)
 						m.OnExitPlayMode();
 				} catch (Exception e) {
-					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to exit play mode for mod {Mod.Metadata.GetId()}@{Mod.Metadata.GetVersion()}", e));
+					Mod.CoreAPI.LoggerAPI.LogException(new Exception($"Failed to exit play mode for mod {Mod.Metadata.Id}@{Mod.Metadata.Version}", e));
 				}
 
 				profiler.Set("exit_play_mode", Name, i.ToString(), Profiler.At.End, DateTime.UtcNow);

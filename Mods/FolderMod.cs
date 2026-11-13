@@ -19,46 +19,46 @@ namespace Nox.ModLoader.Mods {
 	/// </summary>
 	public class FolderMod : Mod {
 		public new const string MOD_FOLDER_TYPE = "folder";
-		
+
 		private readonly List<IModAssemblyLoader> _assemblyLoaders = new();
-		private readonly List<NativePluginLoader> _nativeLoaders   = new();
-		private readonly List<Type>               _loadedTypes     = new();
-		private          bool                     _isLoaded;
-		
-		
-		public override string GetModType()
+		private readonly List<NativePluginLoader> _nativeLoaders = new();
+		private readonly List<Type> _loadedTypes = new();
+		private bool _isLoaded;
+
+
+		public override string ModType
 			=> MOD_FOLDER_TYPE;
 
-		#if !ENABLE_IL2CPP
+#if !ENABLE_IL2CPP
 		/// <summary>
 		/// Custom AssemblyLoadContext for isolating this mod's assemblies.
 		/// Allows proper unloading of mod assemblies at runtime.
 		/// </summary>
 		private ModAssemblyLoadContext _context;
-		
+
 		/// <summary>
 		/// Permission context for this mod, based on declared permissions in nox.mod.json.
 		/// </summary>
 		private ModPermissionContext _permissionContext;
-		#endif
+#endif
 
 		public string FolderPath
-			=> Metadata?.InternalData.TryGetValue("folder", out var folder) == true
+			=> _metadata?.InternalData.TryGetValue("folder", out var folder) == true
 				? (string)folder
 				: null;
 
-		public override AppDomain GetAppDomain() {
-			#if !ENABLE_IL2CPP
-			return _context?.AppDomain ?? AppDomain.CurrentDomain;
-			#else
-			return AppDomain.CurrentDomain;
-			#endif
-		}
+		public override AppDomain AppDomain
+#if !ENABLE_IL2CPP
+			=> _context?.AppDomain ?? AppDomain.CurrentDomain;
+#else
+			=> AppDomain.CurrentDomain;
+#endif
+
 
 		public override Assembly[] GetAssemblies() {
 			var assemblies = new List<Assembly>();
 
-			#if !ENABLE_IL2CPP
+#if !ENABLE_IL2CPP
 			// Get assemblies from the isolated context
 			if (_context != null)
 				assemblies.AddRange(_context.Assemblies);
@@ -72,79 +72,79 @@ namespace Nox.ModLoader.Mods {
 				if (!assemblies.Contains(assembly))
 					assemblies.Add(assembly);
 			}
-			#endif
+#endif
 
 			return assemblies.ToArray();
 		}
 
 		internal FolderMod() {
-			CoreAPI  = new CoreAPI(this);
+			CoreAPI = new CoreAPI(this);
 			AssetAPI = new FolderAssetAPI(this);
 		}
 
-		public override bool IsLoaded()
-			=> _isLoaded && base.IsLoaded();
+		public override bool IsLoaded
+			  => _isLoaded && base.IsLoaded;
 
 		public override async UniTask<bool> Load() {
 			var folderPath = FolderPath;
 			if (string.IsNullOrEmpty(folderPath)) {
-				Logger.LogError($"FolderMod {Metadata?.GetId()} has no folder path");
+				Logger.LogError($"FolderMod {Metadata?.Id} has no folder path");
 				return false;
 			}
 
-			Logger.LogDebug($"Loading folder mod {Metadata.GetId()}@{Metadata.GetVersion()} from '{folderPath}'");
+			Logger.LogDebug($"Loading folder mod {Metadata.Id}@{Metadata.Version} from '{folderPath}'");
 
 			try {
-				#if !ENABLE_IL2CPP
+#if !ENABLE_IL2CPP
 				// Create isolated AssemblyLoadContext for this mod
-				_context = new ModAssemblyLoadContext(Metadata.GetId(), folderPath);
-				Logger.LogDebug($"Created isolated AssemblyLoadContext for mod {Metadata.GetId()}");
+				_context = new ModAssemblyLoadContext(Metadata.Id, folderPath);
+				Logger.LogDebug($"Created isolated AssemblyLoadContext for mod {Metadata.Id}");
 
 				_permissionContext = new ModPermissionContext(
-					Metadata.GetId(),
-					Metadata.GetPermissions(),
+					Metadata.Id,
+					Metadata.Permissions,
 					isKernel: false // FolderMods are NEVER kernel mods
 				);
 
 				Logger.LogDebug($"[Permissions] {_permissionContext.GetSummary()}");
-				#endif
+#endif
 
 				// Load managed assemblies
-				if (!await LoadManagedAssemblies()) {
-					Logger.LogError($"Failed to load managed assemblies for mod {Metadata.GetId()}");
+				if (!LoadManagedAssemblies()) {
+					Logger.LogError($"Failed to load managed assemblies for mod {Metadata.Id}");
 					return false;
 				}
 
 				// Load native plugins
 				if (!LoadNativePlugins()) {
-					Logger.LogError($"Failed to load native plugins for mod {Metadata.GetId()}");
+					Logger.LogError($"Failed to load native plugins for mod {Metadata.Id}");
 					return false;
 				}
 
 				// Register assets
 				if (!await AssetAPI.RegisterAssets()) {
-					Logger.LogError($"Failed to register assets for mod {Metadata.GetId()}");
+					Logger.LogError($"Failed to register assets for mod {Metadata.Id}");
 					return false;
 				}
 
-				#if UNITY_EDITOR
+#if UNITY_EDITOR
 				EditorGlobalAsset.Register(AssetAPI);
-				#endif
+#endif
 
 				_isLoaded = true;
 				return await base.Load();
 			} catch (Exception ex) {
-				Logger.LogError(new Exception($"Exception loading folder mod {Metadata.GetId()}", ex));
+				Logger.LogError(new Exception($"Exception loading folder mod {Metadata.Id}", ex));
 				return false;
 			}
 		}
 
-		private async UniTask<bool> LoadManagedAssemblies() {
+		private bool LoadManagedAssemblies() {
 			var folderPath = FolderPath;
 			if (string.IsNullOrEmpty(folderPath))
 				return true;
 
-			var references = Metadata.GetReferences()
+			var references = Metadata.References
 				.Where(r => r.IsCompatible())
 				.ToList();
 
@@ -155,13 +155,13 @@ namespace Nox.ModLoader.Mods {
 
 				var fullPath = Path.Combine(folderPath, filePath);
 
-				#if ENABLE_IL2CPP
+#if ENABLE_IL2CPP
 				if (!IL2CPPAssemblyHelper.LoadAssembly(fullPath, filePath, _assemblyLoaders, _loadedTypes))
 					return false;
-				#else
+#else
 				if (!MonoAssemblyHelper.LoadAssembly(fullPath, filePath, _assemblyLoaders, _loadedTypes, _context, _permissionContext))
 					return false;
-				#endif
+#endif
 			}
 
 			return true;
@@ -201,34 +201,34 @@ namespace Nox.ModLoader.Mods {
 		}
 
 		private static string GetPlatformNativePath(string basePath) {
-			#if UNITY_STANDALONE_WIN
+#if UNITY_STANDALONE_WIN
 			return Path.Combine(basePath, "native", Environment.Is64BitProcess ? "win-x64" : "win-x86");
-			#elif UNITY_STANDALONE_LINUX
+#elif UNITY_STANDALONE_LINUX
             return Path.Combine(basePath, "native", "linux-x64");
-			#elif UNITY_STANDALONE_OSX
+#elif UNITY_STANDALONE_OSX
             return Path.Combine(basePath, "native", "osx-x64");
-			#elif UNITY_ANDROID
+#elif UNITY_ANDROID
             return Path.Combine(basePath, "native", "android");
-			#else
+#else
             return Path.Combine(basePath, "native");
-			#endif
+#endif
 		}
 
 		private static string[] GetPlatformNativeFiles(string nativePath) {
-			#if UNITY_STANDALONE_WIN
+#if UNITY_STANDALONE_WIN
 			return !Directory.Exists(nativePath)
 				? Array.Empty<string>()
 				: Directory.GetFiles(nativePath, "*.dll");
-			#elif UNITY_STANDALONE_OSX
+#elif UNITY_STANDALONE_OSX
 			var files = new List<string>();
 			files.AddRange(Directory.GetFiles(nativePath, "*.dylib"));
 			files.AddRange(Directory.GetFiles(nativePath, "*.bundle"));
 			return files.ToArray();
-			#elif UNITY_STANDALONE_LINUX || UNITY_ANDROID
+#elif UNITY_STANDALONE_LINUX || UNITY_ANDROID
             return Directory.GetFiles(nativePath, "*.so");
-			#else
+#else
             return Array.Empty<string>();
-			#endif
+#endif
 		}
 
 		/// <summary>
@@ -238,7 +238,7 @@ namespace Nox.ModLoader.Mods {
 		/// <returns></returns>
 		private static bool IsManagedAssembly(string path) {
 			try {
-				using var fs     = new FileStream(path, FileMode.Open, FileAccess.Read);
+				using var fs = new FileStream(path, FileMode.Open, FileAccess.Read);
 				using var reader = new BinaryReader(fs);
 
 				if (reader.ReadUInt16() != 0x5A4D)
@@ -259,14 +259,14 @@ namespace Nox.ModLoader.Mods {
 					return false;
 
 				fs.Seek(2, SeekOrigin.Current);
-				var magic   = reader.ReadUInt16();
+				var magic = reader.ReadUInt16();
 				var is64Bit = magic == 0x20B;
 
 				var skipSize = is64Bit ? 104 : 88;
 				fs.Seek(skipSize, SeekOrigin.Current);
 				fs.Seek(14 * 8, SeekOrigin.Current);
 
-				var cliHeaderRva  = reader.ReadUInt32();
+				var cliHeaderRva = reader.ReadUInt32();
 				var cliHeaderSize = reader.ReadUInt32();
 
 				return cliHeaderRva != 0 && cliHeaderSize != 0;
@@ -276,7 +276,7 @@ namespace Nox.ModLoader.Mods {
 		}
 
 		public override async UniTask<bool> Unload() {
-			Logger.LogDebug($"Unloading folder mod {Metadata.GetId()}@{Metadata.GetVersion()}");
+			Logger.LogDebug($"Unloading folder mod {Metadata.Id}@{Metadata.Version}");
 
 			try {
 				if (!await base.Unload())
@@ -301,21 +301,21 @@ namespace Nox.ModLoader.Mods {
 				_assemblyLoaders.Clear();
 				_loadedTypes.Clear();
 
-				#if !ENABLE_IL2CPP
+#if !ENABLE_IL2CPP
 				// Unload the isolated AssemblyLoadContext
 				if (_context != null) {
 					_context.Unload();
 					_context = null;
-					Logger.LogDebug($"Unloaded AssemblyLoadContext for mod {Metadata.GetId()}");
+					Logger.LogDebug($"Unloaded AssemblyLoadContext for mod {Metadata.Id}");
 				}
-				#endif
+#endif
 
 				// Unregister assets
-				#if UNITY_EDITOR
+#if UNITY_EDITOR
 				EditorGlobalAsset.Unregister(AssetAPI);
-				#endif
+#endif
 				if (!await AssetAPI.UnRegisterAssets())
-					Logger.LogWarning($"Failed to unregister assets for mod {Metadata.GetId()}");
+					Logger.LogWarning($"Failed to unregister assets for mod {Metadata.Id}");
 
 				_isLoaded = false;
 
@@ -323,10 +323,10 @@ namespace Nox.ModLoader.Mods {
 				GC.WaitForPendingFinalizers();
 				GC.Collect();
 
-				Logger.LogDebug($"Successfully unloaded folder mod {Metadata.GetId()}");
+				Logger.LogDebug($"Successfully unloaded folder mod {Metadata.Id}");
 				return true;
 			} catch (Exception ex) {
-				Logger.LogError(new Exception($"Exception unloading folder mod {Metadata.GetId()}", ex));
+				Logger.LogError(new Exception($"Exception unloading folder mod {Metadata.Id}", ex));
 				return false;
 			}
 		}

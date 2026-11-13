@@ -8,7 +8,7 @@ namespace Nox.ModLoader.Core.Libs {
 	public class LibAPI : ILibAPI {
 		private readonly Mod _mod;
 		private string MId
-			=> _mod.Metadata.GetId();
+			=> _mod.Metadata.Id;
 
 		public LibAPI(Mod mod)
 			=> _mod = mod;
@@ -33,7 +33,7 @@ namespace Nox.ModLoader.Core.Libs {
 			var folder = _mod.GetData<string>("folder");
 			if (!string.IsNullOrEmpty(folder))
 				return Build(folder);
-			_mod.CoreAPI.LoggerAPI.LogWarning($"Mod {_mod.Metadata.GetId()} does not have a folder path. Native plugins will not be loaded. This may indicate an issue with the mod's structure or packaging.");
+			_mod.CoreAPI.LoggerAPI.LogWarning($"Mod {_mod.Metadata.Id} does not have a folder path. Native plugins will not be loaded. This may indicate an issue with the mod's structure or packaging.");
 			return Array.Empty<string>();
 			#else
 			if (_mod is KernelMod) {
@@ -43,7 +43,7 @@ namespace Nox.ModLoader.Core.Libs {
 				// External (folder) mods keep plugins next to their bundle
 				var folder = _mod.GetData<string>("folder");
 				if (string.IsNullOrEmpty(folder)) {
-					_mod.CoreAPI.LoggerAPI.LogWarning($"Mod {_mod.Metadata.GetId()} does not have a folder path. Native plugins will not be loaded. This may indicate an issue with the mod's structure or packaging.");
+					_mod.CoreAPI.LoggerAPI.LogWarning($"Mod {_mod.Metadata.Id} does not have a folder path. Native plugins will not be loaded. This may indicate an issue with the mod's structure or packaging.");
 					return Array.Empty<string>();
 				}
 				return Build(folder);

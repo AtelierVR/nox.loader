@@ -1,7 +1,8 @@
-{
+﻿{
     "name": "Nox.ModLoader",
     "rootNamespace": "",
     "references": [
+        "Nox.CCK.Assets",
         "Nox.CCK",
         "UniTask",
         "Nox.CCK.Worlds"

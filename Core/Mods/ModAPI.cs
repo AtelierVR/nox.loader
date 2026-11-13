@@ -1,6 +1,5 @@
 using System.Linq;
 using Cysharp.Threading.Tasks;
-using Nox.CCK.Mods;
 using Nox.CCK.Mods.Metadata;
 using Nox.ModLoader.Mods;
 using UnityEngine;
@@ -15,7 +14,7 @@ namespace Nox.ModLoader.Cores.Mods {
 
 
 		public IModMetadata GetMetadata(string id)
-			=> GetMod(id)?.GetMetadata();
+			=> GetMod(id)?.Metadata;
 
 		public CCK.Mods.IMod GetSelf()
 			=> _mod;
@@ -27,52 +26,54 @@ namespace Nox.ModLoader.Cores.Mods {
 				return null;
 			}
 
+			if (ReferenceEquals(mod, _mod))
+				return mod;
 
-			var relations = _mod.GetMetadata().GetRelations();
+			var relations = _mod.Metadata.Relations;
 			var found = false;
 
 			foreach (var relation in relations)
-				if (mod.GetMetadata().Match(relation))
+				if (mod.Metadata.Match(relation))
 					found = true;
 
 			if (found)
 				return mod;
 
-			if (_mod.GetModType() == KernelMod.MOD_FOLDER_TYPE) {
-				_mod.CoreAPI.LoggerAPI.LogWarning($"Mod with id '{id}' is not related to mod '{_mod.GetMetadata().GetId()}' but access is allowed because it is a kernel mod.");
+			if (_mod.ModType == KernelMod.MOD_FOLDER_TYPE) {
+				_mod.CoreAPI.LoggerAPI.LogWarning($"Mod with id '{id}' is not related to mod '{_mod.Metadata.Id}' but access is allowed because it is a kernel mod.");
 				return mod;
 			}
-			
-			if (_mod.GetMetadata().GetPermissions().Contains("mod_api_all_access")) {
-				_mod.CoreAPI.LoggerAPI.LogWarning($"Mod with id '{id}' is not related to mod '{_mod.GetMetadata().GetId()}' but access is allowed due to 'mod_api_all_access' permission.");
+
+			if (_mod.Metadata.Permissions.Contains("mod_api_all_access")) {
+				_mod.CoreAPI.LoggerAPI.LogWarning($"Mod with id '{id}' is not related to mod '{_mod.Metadata.Id}' but access is allowed due to 'mod_api_all_access' permission.");
 				return mod;
 			}
 
 			if (Application.isEditor) {
-				_mod.CoreAPI.LoggerAPI.LogWarning($"Mod with id '{id}' is not related to mod '{_mod.GetMetadata().GetId()}' but access is allowed for development purposes.");
+				_mod.CoreAPI.LoggerAPI.LogWarning($"Mod with id '{id}' is not related to mod '{_mod.Metadata.Id}' but access is allowed for development purposes.");
 				return mod;
 			}
 
-			_mod.CoreAPI.LoggerAPI.LogError($"Mod with id '{id}' is not related to mod '{_mod.GetMetadata().GetId()}' and cannot be accessed.");
+			_mod.CoreAPI.LoggerAPI.LogError($"Mod with id '{id}' is not related to mod '{_mod.Metadata.Id}' and cannot be accessed.");
 			return null;
 		}
 
 		public CCK.Mods.IMod[] GetMods() {
 			var mods = ModManager.GetMods();
 
-			if (_mod.GetModType() == KernelMod.MOD_FOLDER_TYPE) {
+			if (_mod.ModType == KernelMod.MOD_FOLDER_TYPE) {
 				// Kernel mods have access to all mods.
 				return mods.Cast<CCK.Mods.IMod>().ToArray();
 			}
 
-			if (_mod.GetMetadata().GetPermissions().Contains("mod_api_all_access") || Application.isEditor) {
+			if (_mod.Metadata.Permissions.Contains("mod_api_all_access") || Application.isEditor) {
 				// Mods with all access permission can access all mods.
 				return mods.Cast<CCK.Mods.IMod>().ToArray();
 			}
 
-			var relations = _mod.GetMetadata().GetRelations();
+			var relations = _mod.Metadata.Relations;
 			return (from mod in mods
-				where relations.Any(relation => mod.GetMetadata().Match(relation))
+				where relations.Any(relation => mod.Metadata.Match(relation))
 				select mod).Cast<CCK.Mods.IMod>()
 				.ToArray();
 		}

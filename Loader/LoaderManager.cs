@@ -44,7 +44,7 @@ namespace Nox.ModLoader.Loader {
 				var mod = mods[i];
 				Logger.ShowProgress(
 					nameof(LoaderManager),
-					$"Enabling {mod.Metadata.GetId()}@{mod.Metadata.GetVersion()}...",
+					$"Enabling {mod.Metadata.Id}@{mod.Metadata.Version}...",
 					(float)(i + 1) / mods.Count,
 					background: true
 				);
@@ -74,7 +74,7 @@ namespace Nox.ModLoader.Loader {
 				var mod = mods[i];
 				Logger.ShowProgress(
 					nameof(LoaderManager),
-					$"Disabling {mod.Metadata.GetId()}@{mod.Metadata.GetVersion()}...",
+					$"Disabling {mod.Metadata.Id}@{mod.Metadata.Version}...",
 					(float)(i + 1) / mods.Count,
 					background: true
 				);
@@ -116,7 +116,7 @@ namespace Nox.ModLoader.Loader {
 				var mod = mods[i];
 				Logger.ShowProgress(
 					nameof(LoaderManager),
-					$"Initializing {mod.Metadata.GetId()}@{mod.Metadata.GetVersion()}...",
+					$"Initializing {mod.Metadata.Id}@{mod.Metadata.Version}...",
 					(float)(i + 1) / mods.Count / 2,
 					background: true
 				);
@@ -130,7 +130,7 @@ namespace Nox.ModLoader.Loader {
 				var mod = mods[i];
 				Logger.ShowProgress(
 					nameof(LoaderManager),
-					$"Post-Initializing {mod.Metadata.GetId()}@{mod.Metadata.GetVersion()}...",
+					$"Post-Initializing {mod.Metadata.Id}@{mod.Metadata.Version}...",
 					0.5f + ((float)(i + 1) / mods.Count / 2),
 					background: true
                 );
@@ -149,7 +149,7 @@ namespace Nox.ModLoader.Loader {
 		/// Indispensable avant un reload de domaine : Unity ne déroule alors ni les
 		/// <c>OnDestroy</c> ni le démontage normal, et les continuations UniTask ne sont plus
 		/// pompées — impossible d'<c>await</c> ici. Chaque mod libère donc ses ressources
-		/// (sockets d'écoute, threads, handles…) via la partie synchrone de ses callbacks de
+		/// (sockets d'écoute, threads, handles...) via la partie synchrone de ses callbacks de
 		/// dispose, au lieu de les laisser survivre au domaine suivant.
 		/// </para>
 		/// </summary>
@@ -169,7 +169,7 @@ namespace Nox.ModLoader.Loader {
 					mod.DisposeSync();
 				} catch (Exception e) {
 					Logger.LogError(
-						new Exception($"Failed to dispose {mod.Metadata.GetId()}@{mod.Metadata.GetVersion()} synchronously", e),
+						new Exception($"Failed to dispose {mod.Metadata.Id}@{mod.Metadata.Version} synchronously", e),
 						tag: nameof(LoaderManager)
 					);
 				}
@@ -225,7 +225,7 @@ namespace Nox.ModLoader.Loader {
 				var mod = mods[i];
 				Logger.ShowProgress(
 					nameof(LoaderManager),
-					$"Pre-Disposing {mod.Metadata.GetId()}@{mod.Metadata.GetVersion()}...",
+					$"Pre-Disposing {mod.Metadata.Id}@{mod.Metadata.Version}...",
 					(float)(mods.Count - i) / mods.Count / 2,
 					background: true
 				);
@@ -239,7 +239,7 @@ namespace Nox.ModLoader.Loader {
 				var mod = mods[i];
 				Logger.ShowProgress(
 					nameof(LoaderManager),
-					$"Disposing {mod.Metadata.GetId()}@{mod.Metadata.GetVersion()}...",
+					$"Disposing {mod.Metadata.Id}@{mod.Metadata.Version}...",
 					0.5f + ((float)(mods.Count - i) / mods.Count / 2),
 					background: true
                 );
@@ -258,7 +258,7 @@ namespace Nox.ModLoader.Loader {
 
 			Logger.Log($"{loaded.Mods.Length} mods loaded:", tag: nameof(LoaderManager));
 			foreach (var mod in loaded.Mods)
-				Logger.Log($" - {mod.Metadata.GetId()}@{mod.Metadata.GetVersion()}", tag: nameof(LoaderManager));
+				Logger.Log($" - {mod.Metadata.Id}@{mod.Metadata.Version}", tag: nameof(LoaderManager));
 
 			foreach (var result in loaded.Results)
 				if (result.IsError)

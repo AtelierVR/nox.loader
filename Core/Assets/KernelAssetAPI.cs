@@ -21,7 +21,7 @@ namespace Nox.ModLoader.Cores.Assets {
         private bool _loaded;
 
         public override string ToString() 
-            => $"{GetType().Name}[Id={_kernelMod.Metadata.GetId()}, Version={_kernelMod.Metadata.GetVersion()}]";
+            => $"{GetType().Name}[Id={_kernelMod.Metadata.Id}, Version={_kernelMod.Metadata.Version}]";
 
         public bool HasAsset<T>(ResourceIdentifier path)
             where T : Object {

@@ -11,33 +11,33 @@ namespace Nox.ModLoader.Cores.Loggers {
 			=> _mod = mod;
 		
 		public void Log(string message)
-			=> Logger.Log(message, tag: _mod.Metadata.GetId());
+			=> Logger.Log(message, tag: _mod.Metadata.Id);
 
 		public void LogWarning(string message)
-			=> Logger.LogWarning(message, tag: _mod.Metadata.GetId());
+			=> Logger.LogWarning(message, tag: _mod.Metadata.Id);
 
 		public void LogError(string message)
-			=> Logger.LogError(message, tag: _mod.Metadata.GetId());
+			=> Logger.LogError(message, tag: _mod.Metadata.Id);
 
 		public void LogDebug(string message)
-			=> Logger.LogDebug(message, tag: _mod.Metadata.GetId());
+			=> Logger.LogDebug(message, tag: _mod.Metadata.Id);
 
 		public void LogException(Exception exception)
-			=> Logger.LogException(exception, tag: _mod.Metadata.GetId());
+			=> Logger.LogException(exception, tag: _mod.Metadata.Id);
 
 		public void Log(string message, Object context)
-			=> Logger.Log(message, context, tag: _mod.Metadata.GetId());
+			=> Logger.Log(message, context, tag: _mod.Metadata.Id);
 
 		public void LogWarning(string message, Object context)
-			=> Logger.LogWarning(message, context, tag: _mod.Metadata.GetId());
+			=> Logger.LogWarning(message, context, tag: _mod.Metadata.Id);
 
 		public void LogError(string message, Object context)
-			=> Logger.LogError(message, context, tag: _mod.Metadata.GetId());
+			=> Logger.LogError(message, context, tag: _mod.Metadata.Id);
 
 		public void LogDebug(string message, Object context)
-			=> Logger.LogDebug(message, context, tag: _mod.Metadata.GetId());
+			=> Logger.LogDebug(message, context, tag: _mod.Metadata.Id);
 
 		public void LogException(Exception exception, Object context)
-			=> Logger.LogException(exception, context, tag: _mod.Metadata.GetId());
+			=> Logger.LogException(exception, context, tag: _mod.Metadata.Id);
 	}
 }

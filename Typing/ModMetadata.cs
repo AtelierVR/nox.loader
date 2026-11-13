@@ -69,7 +69,7 @@ namespace Nox.ModLoader.Typing {
 						? license.Value<string>()
 						: null,
 					_contact = json.TryGetValue("contact", out var contact)
-						? Contact.LoadFromJson(contact)
+						? Typing.Contact.LoadFromJson(contact)
 						: new Contact(),
 					_authors = json.TryGetValue("authors", out var authors)
 						? authors.ToArray().Select(Person.LoadFromJson).ToArray()
@@ -152,21 +152,21 @@ namespace Nox.ModLoader.Typing {
 		/// Get the id of the mod.
 		/// </summary>
 		/// <returns></returns>
-		public string GetId()
+		public string Id
 			=> _id;
 
 		/// <summary>
 		/// Get alternative ids of the mod.
 		/// </summary>
 		/// <returns></returns>
-		public string[] GetProvides()
+		public string[] Provides
 			=> _provides;
 
 		/// <summary>
 		/// Get the version of the mod.
 		/// </summary>
 		/// <returns></returns>
-		public Version GetVersion()
+		public Version Version
 			=> _version;
 
 
@@ -177,14 +177,14 @@ namespace Nox.ModLoader.Typing {
 		/// Get the name of the mod.
 		/// </summary>
 		/// <returns></returns>
-		public string GetName()
+		public string Name
 			=> _name;
 
 		/// <summary>
 		/// Get the description of the mod.
 		/// </summary>
 		/// <returns></returns>
-		public string GetDescription()
+		public string Description
 			=> _description;
 
 		/// <summary>
@@ -199,7 +199,7 @@ namespace Nox.ModLoader.Typing {
 		/// Get the authors of the mod.
 		/// </summary>
 		/// <returns></returns>
-		public IPerson[] GetAuthors()
+		public IPerson[] Authors
 			=> GetInternalAuthors().ToArray<IPerson>();
 
 		internal Person[] GetInternalAuthors()
@@ -209,7 +209,7 @@ namespace Nox.ModLoader.Typing {
 		/// Get the contact of the mod.
 		/// </summary>
 		/// <returns></returns>
-		public IContact GetContact()
+		public IContact Contact
 			=> GetInternalContact();
 
 		internal Contact GetInternalContact()
@@ -219,7 +219,7 @@ namespace Nox.ModLoader.Typing {
 		/// Get the contributors of the mod.
 		/// </summary>
 		/// <returns></returns>
-		public IPerson[] GetContributors()
+		public IPerson[] Contributors
 			=> GetInternalContributors().ToArray<IPerson>();
 
 		internal Person[] GetInternalContributors()
@@ -229,7 +229,7 @@ namespace Nox.ModLoader.Typing {
 		/// Get the license of the mod.
 		/// </summary>
 		/// <returns></returns>
-		public string GetLicense()
+		public string License
 			=> _license;
 
 
@@ -240,7 +240,7 @@ namespace Nox.ModLoader.Typing {
 		/// Get relations of the mod.
 		/// </summary>
 		/// <returns></returns>
-		public IRelation[] GetRelations()
+		public IRelation[] Relations
 			=> GetInternalRelations().ToArray<IRelation>();
 
 		internal Relation[] GetInternalRelations()
@@ -250,7 +250,7 @@ namespace Nox.ModLoader.Typing {
 		/// Get relation of the mod that breaks.
 		/// </summary>
 		/// <returns></returns>
-		public IRelation[] GetBreaks()
+		public IRelation[] Breaks
 			=> GetInternalBreaks().ToArray<IRelation>();
 
 		internal Relation[] GetInternalBreaks()
@@ -262,7 +262,7 @@ namespace Nox.ModLoader.Typing {
 		/// Get relation of the mod that conflicts.
 		/// </summary>
 		/// <returns></returns>
-		public IRelation[] GetConflicts()
+		public IRelation[] Conflicts
 			=> GetInternalConflicts().ToArray<IRelation>();
 
 		internal Relation[] GetInternalConflicts()
@@ -274,7 +274,7 @@ namespace Nox.ModLoader.Typing {
 		/// Get relation of the mod that depends.
 		/// </summary>
 		/// <returns></returns>
-		public IRelation[] GetDepends()
+		public IRelation[] Depends
 			=> GetInternalDepends().ToArray<IRelation>();
 
 		internal Relation[] GetInternalDepends()
@@ -286,7 +286,7 @@ namespace Nox.ModLoader.Typing {
 		/// Get relation of the mod that recommends.
 		/// </summary>
 		/// <returns></returns>
-		public IRelation[] GetRecommends()
+		public IRelation[] Recommends
 			=> GetInternalRecommends().ToArray<IRelation>();
 
 		internal Relation[] GetInternalRecommends()
@@ -298,7 +298,7 @@ namespace Nox.ModLoader.Typing {
 		/// Get relation of the mod that suggests.
 		/// </summary>
 		/// <returns></returns>
-		public IRelation[] GetSuggests()
+		public IRelation[] Suggests
 			=> GetInternalSuggests().ToArray<IRelation>();
 
 		internal Relation[] GetInternalSuggests()
@@ -325,21 +325,21 @@ namespace Nox.ModLoader.Typing {
 		/// Get the data type of the mod.
 		/// </summary>
 		/// <returns></returns>
-		public string GetDataType()
+		public string DataType
 			=> "mod";
 
 		/// <summary>
 		/// Get the permissions of the mod.
 		/// </summary>
 		/// <returns></returns>
-		public string[] GetPermissions()
+		public string[] Permissions
 			=> _permissions;
 
 		/// <summary>
 		/// Get the entry points of the mod.
 		/// </summary>
 		/// <returns></returns>
-		public IEntries GetEntryPoints()
+		public IEntries EntryPoints
 			=> GetInternalEntryPoints() as IEntries;
 
 		internal Entries GetInternalEntryPoints()
@@ -349,7 +349,7 @@ namespace Nox.ModLoader.Typing {
 		/// Get the references of the mod.
 		/// </summary>
 		/// <returns></returns>
-		public IReference[] GetReferences()
+		public IReference[] References
 			=> GetInternalReferences().Cast<IReference>().ToArray();
 
 		internal Reference[] GetInternalReferences()
@@ -362,7 +362,7 @@ namespace Nox.ModLoader.Typing {
 		/// Get the custom objects of the mod.
 		/// </summary>
 		/// <returns></returns>
-		public Dictionary<string, object> GetCustoms()
+		public Dictionary<string, object> Customs
 			=> _customs.ToObject<Dictionary<string, object>>();
 
 		/// <summary>
@@ -394,16 +394,15 @@ namespace Nox.ModLoader.Typing {
 		/// <param name="req"></param>
 		/// <returns></returns>
 		public bool Match(IModMetadata req)
-			=> (req.GetId() == GetId() || req.GetProvides().Contains(GetId()))
-				&& req.GetVersion() == GetVersion();
-
+			=> (req.Id == Id || req.Provides.Contains(Id))
+			&& req.Version == Version;
 		/// <summary>
 		/// Check if the mod matches the id.
 		/// </summary>
 		/// <param name="id">Id or alternative id of another mod</param>
 		/// <returns></returns>
 		public bool Match(string id)
-			=> id == GetId() || GetProvides().Contains(id);
+			=> id == Id || Provides.Contains(id);
 
 		/// <summary>
 		/// Check if the mod matches the relation.
@@ -412,9 +411,7 @@ namespace Nox.ModLoader.Typing {
 		/// <returns></returns>
 		public bool Match(IRelation relation)
 			=> Match(relation.GetId())
-				&& relation.GetVersion().Matches(GetVersion());
-
-		// Serialization
+			&& relation.GetVersion().Matches(Version);
 
 
 		/// <summary>
@@ -434,33 +431,33 @@ namespace Nox.ModLoader.Typing {
 		public JObject ToObject(ModMetadataFormat format = ModMetadataFormat.None) {
 			var json = new JObject();
 
-			json["type"]         = GetDataType();
-			json["id"]           = GetId();
-			json["provides"]     = new JArray(GetProvides().Select(p => p));
-			json["name"]         = GetName();
-			json["version"]      = GetVersion().ToString();
-			json["description"]  = GetDescription();
-			json["license"]      = GetLicense();
-			json["icon"]         = GetIcon();
-			json["contact"]      = GetInternalContact().ToJson();
-			json["authors"]      = new JArray(GetInternalAuthors().Select(a => a.ToJson()));
+			json["type"] = DataType;
+			json["id"] = Id;
+			json["provides"] = new JArray(Provides.Select(p => p));
+			json["name"] = Name;
+			json["version"] = Version.ToString();
+			json["description"] = Description;
+			json["license"] = License;
+			json["icon"] = GetIcon();
+			json["contact"] = GetInternalContact().ToJson();
+			json["authors"] = new JArray(GetInternalAuthors().Select(a => a.ToJson()));
 			json["contributors"] = new JArray(GetInternalContributors().Select(c => c.ToJson()));
-			json["relations"]    = new JArray(GetInternalRelations().Select(r => r.ToJson()));
-			json["entrypoints"]  = GetInternalEntryPoints().ToJson(
+			json["relations"] = new JArray(GetInternalRelations().Select(r => r.ToJson()));
+			json["entrypoints"] = GetInternalEntryPoints().ToJson(
 				(format & ModMetadataFormat.EntryPointObject) != 0
 					? EntryPointFormat.EntryPointObject
 					: EntryPointFormat.None
 			);
-			json["references"]   = new JArray(GetInternalReferences().Select(r => r.ToJson()));
-			json["permissions"]  = new JArray(GetPermissions().Select(p => p));
+			json["references"] = new JArray(GetInternalReferences().Select(r => r.ToJson()));
+			json["permissions"] = new JArray(Permissions.Select(p => p));
 
-			foreach (var custom in GetCustoms())
-				json[custom.Key] = JToken.FromObject(custom.Value);
+			foreach (var custom in _customs)
+				json[custom.Key] = custom.Value;
 
 			return json;
 		}
 
-		#if UNITY_EDITOR
+#if UNITY_EDITOR
 		public void SetCustom<T>(string key, T value) {
 			if (Application.isPlaying)
 				throw new UnauthorizedAccessException("Cannot set custom data in play mode");
@@ -484,7 +481,7 @@ namespace Nox.ModLoader.Typing {
 			}
 			return false;
 		}
-		#endif
+#endif
 	}
 
 }
