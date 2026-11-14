@@ -110,10 +110,10 @@ namespace Nox.ModLoader.Mods {
 		public virtual UniTask<bool> Load() {
 			CoreAPI.EventAPI.Emit(new ModEventContext("mod_loaded", this));
 
-			var entryPointKeys = _metadata.EntryPoints.All.Keys;
-			_entryPoints = new EntryPoint[entryPointKeys.Count()];
-			var index = 0;
-			foreach (var entry in entryPointKeys) _entryPoints[index++] = new EntryPoint(this, entry);
+			_entryPoints = _metadata.EntryPoints.All.Keys
+				.OrderBy(key => key == EntryPoint.MainEntry ? 0 : 1)
+				.Select(key => new EntryPoint(this, key))
+				.ToArray();
 
 			HasUpdate = false;
 			HasFixedUpdate = false;
@@ -143,7 +143,8 @@ namespace Nox.ModLoader.Mods {
 			// Unload any native libraries loaded by this mod
 			CoreAPI?.LibAPI?.Unload();
 
-			foreach (var entry in _entryPoints) entry.Dispose();
+			for (var i = _entryPoints.Length - 1; i >= 0; i--)
+				_entryPoints[i].Dispose();
 
 			_entryPoints = Array.Empty<EntryPoint>();
 			CoreAPI.EventAPI.Emit(new ModEventContext("mod_unloaded", this));
@@ -152,25 +153,28 @@ namespace Nox.ModLoader.Mods {
 
 		public async UniTask Initialize() {
 			_profiler.Set("initialize", ModProfiler.At.Start, DateTime.UtcNow);
-			var promises = new UniTask[_entryPoints.Length];
-			for (var i = 0; i < _entryPoints.Length; i++) promises[i] = _entryPoints[i].OnInitialize();
-			await UniTask.WhenAll(promises);
+
+			foreach (var entry in _entryPoints)
+				await entry.OnInitialize();
+
 			_profiler.Set("initialized", ModProfiler.At.Start, DateTime.UtcNow);
 		}
 
 		public async UniTask PostInitialize() {
 			_profiler.Set("post_initialize", ModProfiler.At.Start, DateTime.UtcNow);
-			var promises = new UniTask[_entryPoints.Length];
-			for (var i = 0; i < _entryPoints.Length; i++) promises[i] = _entryPoints[i].OnPostInitialize();
-			await UniTask.WhenAll(promises);
+
+			foreach (var entry in _entryPoints)
+				await entry.OnPostInitialize();
+
 			_profiler.Set("post_initialized", ModProfiler.At.Start, DateTime.UtcNow);
 		}
 
 		public async UniTask PreDispose() {
 			_profiler.Set("pre_dispose", ModProfiler.At.Start, DateTime.UtcNow);
-			var promises = new UniTask[_entryPoints.Length];
-			for (var i = 0; i < _entryPoints.Length; i++) promises[i] = _entryPoints[i].OnPreDispose();
-			await UniTask.WhenAll(promises);
+
+			for (var i = _entryPoints.Length - 1; i >= 0; i--)
+				await _entryPoints[i].OnPreDispose();
+
 			_profiler.Set("pre_disposed", ModProfiler.At.Start, DateTime.UtcNow);
 		}
 
@@ -211,9 +215,10 @@ namespace Nox.ModLoader.Mods {
 
 		public async UniTask Dispose() {
 			_profiler.Set("dispose", ModProfiler.At.Start, DateTime.UtcNow);
-			var promises = new UniTask[_entryPoints.Length];
-			for (var i = 0; i < _entryPoints.Length; i++) promises[i] = _entryPoints[i].OnDispose();
-			await UniTask.WhenAll(promises);
+
+			for (var i = _entryPoints.Length - 1; i >= 0; i--)
+				await _entryPoints[i].OnDispose();
+
 			_profiler.Set("disposed", ModProfiler.At.Start, DateTime.UtcNow);
 		}
 
@@ -235,8 +240,8 @@ namespace Nox.ModLoader.Mods {
 			foreach (var entry in _entryPoints)
 				entry.OnPreDisposeSync();
 
-			foreach (var entry in _entryPoints)
-				entry.OnDisposeSync();
+			for (var i = _entryPoints.Length - 1; i >= 0; i--)
+				_entryPoints[i].OnDisposeSync();
 
 			// Libère les éventuelles bibliothèques natives chargées par le mod
 			CoreAPI?.LibAPI?.Unload();

@@ -89,10 +89,12 @@ namespace Nox.ModLoader.EntryPoints {
 		// ReSharper disable Unity.PerformanceAnalysis
 		public void Dispose() {
 			Disable();
+
 			if (_instances != null)
-				foreach (var instance in _instances)
-					if (instance.Reference is IDisposable disposable)
+				for (var i = _instances.Length - 1; i >= 0; i--)
+					if (_instances[i].Reference is IDisposable disposable)
 						disposable.Dispose();
+
 			_instances = null;
 		}
 
@@ -266,7 +268,7 @@ namespace Nox.ModLoader.EntryPoints {
 			eventCtx.Emit(new ModEventContext("mod_dispose", Mod, Name, ExecutionEventStatus.Pre));
 			profiler.Set("dispose", Name, Profiler.At.Start, DateTime.UtcNow);
 
-			for (var i = 0; i < _instances.Length; i++) {
+			for (var i = _instances.Length - 1; i >= 0; i--) {
 				var instance = _instances[i].Reference;
 
 				profiler.Set("dispose", Name, i.ToString(), Profiler.At.Start, DateTime.UtcNow);
