@@ -7,6 +7,7 @@ using Object = UnityEngine.Object;
 using Logger = Nox.CCK.Utils.Logger;
 using System.IO;
 using System.Linq;
+using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using Nox.CCK.Utils;
 using UnityEditor;
@@ -41,27 +42,117 @@ namespace Nox.ModLoader.Cores.Assets {
 		}
 
 		/// <summary>
-		/// Memoized probes, keyed by path and type. Each probe is up to two
+		/// Memoized probes, keyed by path then by type name. Each probe is up to two
 		/// <see cref="AssetDatabase.LoadAssetAtPath{T}"/> calls on the main thread, and a profiler
 		/// capture showed 13.5k <c>ReadObjectFromSerializedFile</c> and 3.8k
 		/// <c>PackageInfo.GetPackageByAssetPath</c> triggered by resolving the same paths over and over.
 		/// <para>
-		/// The key is a tuple: the previous <c>path + "|" + type</c> key built two strings on every
-		/// lookup, including the ones that hit the cache.
+		/// Two levels of keys: a change only reports the path it touched, and dropping every type of that path from
+		/// a flat dictionary would walk the whole cache on each imported file.
 		/// </para>
 		/// </summary>
-		private static readonly ConcurrentDictionary<(string path, string type), AssetProbe> Probes = new();
+		private static readonly ConcurrentDictionary<string, ConcurrentDictionary<string, AssetProbe>> Probes = new();
 
 		[InitializeOnLoadMethod]
 		private static void TrackAssetDatabase() {
-			EditorApplication.projectChanged -= ClearProbes;
-			EditorApplication.projectChanged += ClearProbes;
+			EditorApplication.projectChanged -= OnProjectChanged;
+			EditorApplication.projectChanged += OnProjectChanged;
+			_root = Application.dataPath;
 		}
+
+		/// <summary>Root the caches were built against.</summary>
+		private static string _root;
+
+		/// <summary>
+		/// A project that moved (another <see cref="Application.dataPath"/>) makes every absolute-to-relative answer
+		/// and every probe wrong at once, so that is the only case that clears them: an import, a move or a delete
+		/// only drops the paths it touched, through <see cref="EditorAssetWatcher"/>.
+		/// </summary>
+		private static void OnProjectChanged() {
+			var root = Application.dataPath;
+
+			if (root == _root)
+				return;
+
+			_root = root;
+			ClearProbes();
+			RelativePaths.Clear();
+			_folders = null;
+		}
+
+		/// <summary>Beyond that many changed folders, dropping the whole cache is cheaper than scanning it.</summary>
+		private const int MAX_SUBTREE_SCAN = 32;
 
 		private static void ClearProbes() {
 			Probes.Clear();
-			RelativePaths.Clear();
-			_folders = null;
+			_scenes = null;
+		}
+
+		/// <summary>
+		/// Drops what is cached about the paths a change touched, in one pass: <paramref name="paths"/> are the
+		/// files, <paramref name="subtrees"/> the folders, whose whole content is stale. Everything is batched so a
+		/// reimport of a thousand files costs a thousand dictionary removals and no scan at all.
+		/// </summary>
+		internal static void Invalidate(HashSet<string> paths, HashSet<string> subtrees) {
+			foreach (var path in paths) {
+				Probes.TryRemove(path, out _);
+
+				// An indirection is probed through `<path>.asset` but keys the target without that suffix.
+				if (path.EndsWith(".asset", StringComparison.OrdinalIgnoreCase))
+					Probes.TryRemove(path[..^6], out _);
+
+				if (_scenes != null && path.EndsWith(".unity", StringComparison.OrdinalIgnoreCase))
+					_scenes.Remove(FormatPath(path));
+			}
+
+			if (subtrees.Count == 0)
+				return;
+
+			if (subtrees.Count > MAX_SUBTREE_SCAN) {
+				ClearProbes();
+				return;
+			}
+
+			var prefixes          = new string[subtrees.Count];
+			var formattedPrefixes = new string[subtrees.Count];
+			var index             = 0;
+
+			foreach (var subtree in subtrees) {
+				prefixes[index]          = subtree + "/";
+				formattedPrefixes[index] = FormatPath(prefixes[index]);
+				index++;
+			}
+
+			foreach (var key in Probes.Keys)
+			foreach (var prefix in prefixes)
+				if (key.StartsWith(prefix, StringComparison.Ordinal)) {
+					Probes.TryRemove(key, out _);
+					break;
+				}
+
+			if (_scenes == null)
+				return;
+
+			var stale = new List<string>();
+
+			foreach (var key in _scenes.Keys)
+				foreach (var prefix in formattedPrefixes)
+					if (key.StartsWith(prefix, StringComparison.Ordinal)) {
+						stale.Add(key);
+						break;
+					}
+
+			foreach (var key in stale)
+				_scenes.Remove(key);
+		}
+
+		/// <summary>Adds a scene Unity just read again, so a project that had its list built keeps it.</summary>
+		internal static void TrackScene(string path) {
+			if (_scenes == null || string.IsNullOrEmpty(path))
+				return;
+
+			if (path.EndsWith(".unity", StringComparison.OrdinalIgnoreCase))
+				_scenes[FormatPath(path)] = path;
 		}
 
 		/// <summary>
@@ -71,25 +162,34 @@ namespace Nox.ModLoader.Cores.Assets {
 		/// </summary>
 		private static AssetProbe ProbeAsset<T>(string dirpath)
 			where T : Object {
-			var key = (dirpath, typeof(T).Name);
-			if (Probes.TryGetValue(key, out var cached)) {
+			var type = typeof(T).Name;
+
+			var byType = Probes.GetOrAdd(dirpath, static _ => new ConcurrentDictionary<string, AssetProbe>());
+
+			if (byType.TryGetValue(type, out var cached)) {
 				if (cached.HasSymbolic || !cached.HasAsset || cached.Asset)
 					return cached;
 
-				Probes.TryRemove(key, out _);
+				byType.TryRemove(type, out _);
 			}
 
-			var probe    = new AssetProbe();
-			var symbolic = AssetDatabase.LoadAssetAtPath<SymbolicAsset>(dirpath + ".asset");
-			if (symbolic) {
-				probe.HasSymbolic    = true;
-				probe.SymbolicTarget = symbolic.Target;
-			} else {
+			var probe = new AssetProbe();
+
+			if (Exists(dirpath + ".asset")) {
+				var symbolic = AssetDatabase.LoadAssetAtPath<SymbolicAsset>(dirpath + ".asset");
+
+				if (symbolic) {
+					probe.HasSymbolic    = true;
+					probe.SymbolicTarget = symbolic.Target;
+				}
+			}
+
+			if (!probe.HasSymbolic && Exists(dirpath)) {
 				probe.Asset    = AssetDatabase.LoadAssetAtPath<T>(dirpath);
 				probe.HasAsset = probe.Asset;
 			}
 
-			Probes[key] = probe;
+			byType[type] = probe;
 			return probe;
 		}
 
@@ -102,7 +202,7 @@ namespace Nox.ModLoader.Cores.Assets {
 		private static readonly ConcurrentDictionary<string, string> RelativePaths = new();
 
 		private static (string abs, string rel)[] _folders;
-		public override string ToString() 
+		public override string ToString()
 			=> $"{GetType().Name}[Id={_kernelMod.Metadata.Id}, Version={_kernelMod.Metadata.Version}]";
 
 		private static (string abs, string rel)[] GetFolders() {
@@ -136,19 +236,73 @@ namespace Nox.ModLoader.Cores.Assets {
 			Logger.LogWarning($"Path '{path}' is not in Assets, Packages, StreamingAssets or PersistentDataPath.");
 			return path;
 		}
+
+		/// <summary>Absolute path of a project-relative one, or <c>null</c> when it is under none of the roots.</summary>
+		private static string ToAbsolute(string path) {
+			foreach (var (abs, rel) in GetFolders()) {
+				if (path.Length <= rel.Length)
+					continue;
+
+				if (string.Compare(path, 0, rel, 0, rel.Length, StringComparison.OrdinalIgnoreCase) != 0)
+					continue;
+
+				var separator = path[rel.Length];
+
+				if (separator != '/' && separator != '\\')
+					continue;
+
+				return Path.Combine(abs, path[(rel.Length + 1)..]);
+			}
+
+			return null;
+		}
+
+		/// <summary>
+		/// Whether a file sits at that path. Most probes look for an asset the namespace walk will never find, and an
+		/// AssetDatabase lookup that answers "nothing" still resolves the path through the package list while a file
+		/// system stat does not. An unknown root falls back to the AssetDatabase so nothing that resolved stops.
+		/// </summary>
+		private static bool Exists(string path) {
+			var absolute = ToAbsolute(path);
+			return absolute == null || File.Exists(absolute);
+		}
+
 		public static string FormatPath(string path)
 			=> AssetAPIExtension.FormatPath(path);
+
+		/// <summary>
+		/// Scenes of the project, keyed by their formatted path. <see cref="AssetDatabase.FindAssets"/> scans the whole
+		/// database and every world lookup paid for it once per namespace and per call, so the list is read once and
+		/// kept up to date by <see cref="EditorAssetWatcher"/>.
+		/// </summary>
+		private static Dictionary<string, string> _scenes;
+
+		private static Dictionary<string, string> Scenes {
+			get {
+				if (_scenes != null)
+					return _scenes;
+
+				var scenes = new Dictionary<string, string>(StringComparer.Ordinal);
+
+				foreach (var guid in AssetDatabase.FindAssets("t:Scene")) {
+					var path = AssetDatabase.GUIDToAssetPath(guid);
+
+					if (!string.IsNullOrEmpty(path))
+						scenes[FormatPath(path)] = path;
+				}
+
+				return _scenes = scenes;
+			}
+		}
 
 		/// <summary>
 		/// Resolves the asset path of the first scene matching <paramref name="dirpath"/>.
 		/// Returns <c>null</c> when no scene asset matches.
 		/// </summary>
-		private static string FindScenePath(string dirpath) {
-			var formatted = FormatPath(dirpath);
-			return AssetDatabase.FindAssets("t:Scene")
-				.Select(AssetDatabase.GUIDToAssetPath)
-				.FirstOrDefault(p => FormatPath(p) == formatted);
-		}
+		private static string FindScenePath(string dirpath)
+			=> Scenes.TryGetValue(FormatPath(dirpath), out var path)
+				? path
+				: null;
 
 		/// <summary>
 		/// Maps a runtime <see cref="LoadSceneMode"/> to its editor equivalent.
@@ -507,5 +661,62 @@ namespace Nox.ModLoader.Cores.Assets {
 		}
 	}
 
+	/// <summary>
+	/// Keeps the caches of <see cref="EditorKernelAssetAPI"/> in step with the asset database: an import, a move or
+	/// a delete only drops the paths it touched. Clearing everything on <c>EditorApplication.projectChanged</c>
+	/// made every save of any file throw away the whole index, so the lookups that followed reloaded the project.
+	/// </summary>
+	internal sealed class EditorAssetWatcher : AssetPostprocessor {
+		private static void OnPostprocessAllAssets(string[] importedAssets, string[] deletedAssets,
+			string[] movedAssets, string[] movedFromAssetPaths, bool didDomainReload) {
+			// Every cache is static: a domain reload already emptied them.
+			if (didDomainReload)
+				return;
+
+			var paths    = new HashSet<string>(StringComparer.Ordinal);
+			var subtrees = new HashSet<string>(StringComparer.Ordinal);
+
+			Collect(paths, subtrees, importedAssets, null);
+			Collect(paths, subtrees, movedAssets, null);
+			Collect(paths, subtrees, deletedAssets, null);
+			Collect(paths, subtrees, movedFromAssetPaths, movedAssets);
+
+			EditorKernelAssetAPI.Invalidate(paths, subtrees);
+
+			foreach (var path in importedAssets)
+				EditorKernelAssetAPI.TrackScene(path);
+
+			foreach (var path in movedAssets)
+				EditorKernelAssetAPI.TrackScene(path);
+		}
+
+		/// <summary>
+		/// Sorts changed paths between files and folders. A path is a folder when it carries no extension, or when
+		/// it is the source of a move that landed on a folder (the folder name itself may contain a dot).
+		/// </summary>
+		private static void Collect(HashSet<string> paths, HashSet<string> subtrees, string[] changed,
+			string[] movedTo) {
+			if (changed == null)
+				return;
+
+			for (var i = 0; i < changed.Length; i++) {
+				var path = changed[i];
+
+				if (string.IsNullOrEmpty(path))
+					continue;
+
+				path = path.Replace('\\', '/');
+				paths.Add(path);
+
+				var isFolder = Path.GetExtension(path).Length == 0;
+
+				if (!isFolder && movedTo != null && i < movedTo.Length)
+					isFolder = AssetDatabase.IsValidFolder(movedTo[i]);
+
+				if (isFolder)
+					subtrees.Add(path);
+			}
+		}
+	}
 }
 #endif
