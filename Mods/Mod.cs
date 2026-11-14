@@ -153,73 +153,65 @@ namespace Nox.ModLoader.Mods {
 
 		public async UniTask Initialize() {
 			_profiler.Set("initialize", ModProfiler.At.Start, DateTime.UtcNow);
-
 			foreach (var entry in _entryPoints)
 				await entry.OnInitialize();
-
-			_profiler.Set("initialized", ModProfiler.At.Start, DateTime.UtcNow);
+			_profiler.Set("initialize", ModProfiler.At.End, DateTime.UtcNow);
 		}
 
 		public async UniTask PostInitialize() {
 			_profiler.Set("post_initialize", ModProfiler.At.Start, DateTime.UtcNow);
-
 			foreach (var entry in _entryPoints)
 				await entry.OnPostInitialize();
-
-			_profiler.Set("post_initialized", ModProfiler.At.Start, DateTime.UtcNow);
+			_profiler.Set("post_initialize", ModProfiler.At.End, DateTime.UtcNow);
 		}
 
 		public async UniTask PreDispose() {
 			_profiler.Set("pre_dispose", ModProfiler.At.Start, DateTime.UtcNow);
-
 			for (var i = _entryPoints.Length - 1; i >= 0; i--)
 				await _entryPoints[i].OnPreDispose();
-
-			_profiler.Set("pre_disposed", ModProfiler.At.Start, DateTime.UtcNow);
+			_profiler.Set("pre_dispose", ModProfiler.At.End, DateTime.UtcNow);
 		}
 
 		public void Update() {
 			if (!HasUpdate) return;
 			_profiler.Set("update", ModProfiler.At.Start);
 			foreach (var entry in _entryPoints) entry.OnUpdate();
-			_profiler.Set("updated", ModProfiler.At.Start);
+			_profiler.Set("update", ModProfiler.At.End);
 		}
 
 		public void FixedUpdate() {
 			if (!HasFixedUpdate) return;
 			_profiler.Set("fixed_update", ModProfiler.At.Start);
 			foreach (var entry in _entryPoints) entry.OnFixedUpdate();
-			_profiler.Set("fixed_updated", ModProfiler.At.Start);
+			_profiler.Set("fixed_update", ModProfiler.At.End);
 		}
 
 		public void LateUpdate() {
 			if (!HasLateUpdate) return;
 			_profiler.Set("late_update", ModProfiler.At.Start);
 			foreach (var entry in _entryPoints) entry.OnLateUpdate();
-			_profiler.Set("late_updated", ModProfiler.At.Start);
+			_profiler.Set("late_update", ModProfiler.At.End);
 		}
 
 #if UNITY_EDITOR
 		public void EnterPlayMode() {
 			_profiler.Set("enter_play_mode", ModProfiler.At.Start, DateTime.UtcNow);
 			foreach (var entry in _entryPoints) entry.OnEnterPlayMode();
-			_profiler.Set("enter_play_mode_done", ModProfiler.At.Start, DateTime.UtcNow);
+			_profiler.Set("enter_play_mode", ModProfiler.At.End, DateTime.UtcNow);
 		}
 
 		public void ExitPlayMode() {
 			_profiler.Set("exit_play_mode", ModProfiler.At.Start, DateTime.UtcNow);
 			foreach (var entry in _entryPoints) entry.OnExitPlayMode();
-			_profiler.Set("exit_play_mode_done", ModProfiler.At.Start, DateTime.UtcNow);
+			_profiler.Set("exit_play_mode", ModProfiler.At.End, DateTime.UtcNow);
 		}
 #endif
 
 		public async UniTask Dispose() {
 			_profiler.Set("dispose", ModProfiler.At.Start, DateTime.UtcNow);
-
 			for (var i = _entryPoints.Length - 1; i >= 0; i--)
 				await _entryPoints[i].OnDispose();
-
-			_profiler.Set("disposed", ModProfiler.At.Start, DateTime.UtcNow);
+			_profiler.Set("dispose", ModProfiler.At.End, DateTime.UtcNow);
 		}
 
 		/// <summary>
