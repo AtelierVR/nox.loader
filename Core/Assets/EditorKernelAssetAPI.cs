@@ -19,9 +19,9 @@ namespace Nox.ModLoader.Cores.Assets {
 
 	public class EditorKernelAssetAPI : IAssetAPI {
 		public EditorKernelAssetAPI(ModLoader.Mods.KernelMod kernelMod)
-			=> _kernelMod = kernelMod;
+			=> _mod = kernelMod;
 
-		private readonly ModLoader.Mods.KernelMod _kernelMod;
+		private readonly ModLoader.Mods.KernelMod _mod;
 		private bool _loaded;
 
 		/// <summary>
@@ -203,7 +203,7 @@ namespace Nox.ModLoader.Cores.Assets {
 
 		private static (string abs, string rel)[] _folders;
 		public override string ToString()
-			=> $"{GetType().Name}[Id={_kernelMod.Metadata.Id}, Version={_kernelMod.Metadata.Version}]";
+			=> $"{GetType().Name}[Id={_mod.Metadata.Id}, Version={_mod.Metadata.Version}]";
 
 		private static (string abs, string rel)[] GetFolders() {
 			if (_folders != null)
@@ -313,14 +313,14 @@ namespace Nox.ModLoader.Cores.Assets {
 
 		public bool HasAsset<T>(ResourceIdentifier path)
 			where T : Object {
-			path = AssetAPIExtension.Resolve(path, _kernelMod);
+			path = AssetAPIExtension.Resolve(path, _mod);
 			if (HasInternalAsset<T>(path))
 				return true;
 
 			// get on other mods
-			if (AssetAPIExtension.GetOtherLoadedMods(_kernelMod, path.Namespace)
-				.Any(m => m.AssetAPI.HasInternalAsset<T>(path)))
-				return true;
+			foreach (var m in AssetAPIExtension.GetOtherLoadedMods(_mod, path.Namespace))
+				if (m.AssetAPI.HasInternalAsset<T>(path))
+					return true;
 
 			// get from the initial mod
 			var mod = ModManager.GetMod(path.Namespace);
@@ -329,14 +329,14 @@ namespace Nox.ModLoader.Cores.Assets {
 
 		public T GetAsset<T>(ResourceIdentifier path)
 			where T : Object {
-			path = AssetAPIExtension.Resolve(path, _kernelMod);
+			path = AssetAPIExtension.Resolve(path, _mod);
 			// get on Internal mod
 			var result = GetInternalAsset<T>(path);
 			if (result)
 				return result;
 
 			// get on other mods
-			foreach (var m in AssetAPIExtension.GetOtherLoadedMods(_kernelMod, path.Namespace)) {
+			foreach (var m in AssetAPIExtension.GetOtherLoadedMods(_mod, path.Namespace)) {
 				result = m.AssetAPI.GetInternalAsset<T>(path);
 				if (result)
 					return result;
@@ -349,11 +349,11 @@ namespace Nox.ModLoader.Cores.Assets {
 
 		public bool HasInternalAsset<T>(ResourceIdentifier path)
 			where T : Object {
-			path = AssetAPIExtension.Resolve(path, _kernelMod);
+			path = AssetAPIExtension.Resolve(path, _mod);
 			var namespaces = AssetAPIExtension.GetNamespaces(path);
 
 			foreach (var n in namespaces) {
-				var dirpath = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
+				var dirpath = ToRelative(Path.Combine(_mod.GetData<string>("assets"), n, path.Path));
 				var probe   = ProbeAsset<T>(dirpath);
 				if (probe.HasSymbolic) return HasAsset<T>(probe.SymbolicTarget);
 				if (probe.HasAsset) return true;
@@ -364,11 +364,11 @@ namespace Nox.ModLoader.Cores.Assets {
 
 		public T GetInternalAsset<T>(ResourceIdentifier path)
 			where T : Object {
-			path = AssetAPIExtension.Resolve(path, _kernelMod);
+			path = AssetAPIExtension.Resolve(path, _mod);
 			var namespaces = AssetAPIExtension.GetNamespaces(path);
 
 			foreach (var n in namespaces) {
-				var dirpath = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
+				var dirpath = ToRelative(Path.Combine(_mod.GetData<string>("assets"), n, path.Path));
 				var probe   = ProbeAsset<T>(dirpath);
 				if (probe.HasSymbolic) return GetAsset<T>(probe.SymbolicTarget);
 				if (probe.HasAsset) return (T)probe.Asset;
@@ -379,12 +379,12 @@ namespace Nox.ModLoader.Cores.Assets {
 
 		public async UniTask<bool> HasAssetAsync<T>(ResourceIdentifier path, CancellationToken cancellationToken = default)
 			where T : Object {
-			path = AssetAPIExtension.Resolve(path, _kernelMod);
+			path = AssetAPIExtension.Resolve(path, _mod);
 			if (await HasInternalAssetAsync<T>(path, cancellationToken))
 				return true;
 
 			// get on other mods
-			foreach (var m in AssetAPIExtension.GetOtherLoadedMods(_kernelMod, path.Namespace)) {
+			foreach (var m in AssetAPIExtension.GetOtherLoadedMods(_mod, path.Namespace)) {
 				if (await m.AssetAPI.HasInternalAssetAsync<T>(path, cancellationToken))
 					return true;
 			}
@@ -396,14 +396,14 @@ namespace Nox.ModLoader.Cores.Assets {
 
 		public async UniTask<T> GetAssetAsync<T>(ResourceIdentifier path, CancellationToken cancellationToken = default)
 			where T : Object {
-			path = AssetAPIExtension.Resolve(path, _kernelMod);
+			path = AssetAPIExtension.Resolve(path, _mod);
 			// get on Internal mod
 			var result = await GetInternalAssetAsync<T>(path, cancellationToken);
 			if (result)
 				return result;
 
 			// get on other mods
-			foreach (var m in AssetAPIExtension.GetOtherLoadedMods(_kernelMod, path.Namespace)) {
+			foreach (var m in AssetAPIExtension.GetOtherLoadedMods(_mod, path.Namespace)) {
 				result = await m.AssetAPI.GetInternalAssetAsync<T>(path, cancellationToken);
 				if (result)
 					return result;
@@ -416,13 +416,13 @@ namespace Nox.ModLoader.Cores.Assets {
 
 		public async UniTask<bool> HasInternalAssetAsync<T>(ResourceIdentifier path, CancellationToken cancellationToken = default)
 			where T : Object {
-			path = AssetAPIExtension.Resolve(path, _kernelMod);
+			path = AssetAPIExtension.Resolve(path, _mod);
 			await UniTask.Yield(cancellationToken); // Make it properly async
 
 			var namespaces = AssetAPIExtension.GetNamespaces(path);
 
 			foreach (var n in namespaces) {
-				var dirpath = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
+				var dirpath = ToRelative(Path.Combine(_mod.GetData<string>("assets"), n, path.Path));
 				var probe   = ProbeAsset<T>(dirpath);
 				if (probe.HasSymbolic || probe.HasAsset) return true;
 			}
@@ -432,13 +432,13 @@ namespace Nox.ModLoader.Cores.Assets {
 
 		public async UniTask<T> GetInternalAssetAsync<T>(ResourceIdentifier path, CancellationToken cancellationToken = default)
 			where T : Object {
-			path = AssetAPIExtension.Resolve(path, _kernelMod);
+			path = AssetAPIExtension.Resolve(path, _mod);
 			await UniTask.Yield(cancellationToken); // Make it properly async
 
 			var namespaces = AssetAPIExtension.GetNamespaces(path);
 
 			foreach (var n in namespaces) {
-				var dirpath = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
+				var dirpath = ToRelative(Path.Combine(_mod.GetData<string>("assets"), n, path.Path));
 				var probe   = ProbeAsset<T>(dirpath);
 				if (probe.HasSymbolic) return await GetAssetAsync<T>(probe.SymbolicTarget, cancellationToken);
 				if (probe.HasAsset) return (T)probe.Asset;
@@ -448,7 +448,7 @@ namespace Nox.ModLoader.Cores.Assets {
 		}
 
 		public async UniTask<Scene> LoadWorld(ResourceIdentifier path, LoadSceneMode mode = LoadSceneMode.Single) {
-			path = AssetAPIExtension.Resolve(path, _kernelMod);
+			path = AssetAPIExtension.Resolve(path, _mod);
 			// load on Internal mod
 			if (IsLoadedWorld(path))
 				return GetWorld(path);
@@ -457,7 +457,7 @@ namespace Nox.ModLoader.Cores.Assets {
 				return await LoadInternalWorld(path, mode);
 
 			// load on other mods
-			foreach (var m in AssetAPIExtension.GetOtherLoadedMods(_kernelMod, path.Namespace)
+			foreach (var m in AssetAPIExtension.GetOtherLoadedMods(_mod, path.Namespace)
 				.Where(m => m.AssetAPI.HasInternalWorld(path)))
 				return await m.AssetAPI.LoadInternalWorld(path, mode);
 
@@ -470,12 +470,12 @@ namespace Nox.ModLoader.Cores.Assets {
 		}
 
 		public bool HasWorld(ResourceIdentifier path) {
-			path = AssetAPIExtension.Resolve(path, _kernelMod);
+			path = AssetAPIExtension.Resolve(path, _mod);
 			if (HasInternalWorld(path))
 				return true;
 
 			// get on other mods
-			if (AssetAPIExtension.GetOtherLoadedMods(_kernelMod, path.Namespace)
+			if (AssetAPIExtension.GetOtherLoadedMods(_mod, path.Namespace)
 				.Any(m => m.AssetAPI.HasInternalWorld(path)))
 				return true;
 
@@ -485,13 +485,13 @@ namespace Nox.ModLoader.Cores.Assets {
 		}
 
 		public Scene GetWorld(ResourceIdentifier path) {
-			path = AssetAPIExtension.Resolve(path, _kernelMod);
+			path = AssetAPIExtension.Resolve(path, _mod);
 			// get on Internal mod
 			if (IsLoadedInternalWorld(path))
 				return GetInternalWorld(path);
 
 			// get on other mods
-			foreach (var m in AssetAPIExtension.GetOtherLoadedMods(_kernelMod, path.Namespace)
+			foreach (var m in AssetAPIExtension.GetOtherLoadedMods(_mod, path.Namespace)
 				.Where(m => m.AssetAPI.IsLoadedInternalWorld(path)))
 				return m.AssetAPI.GetInternalWorld(path);
 
@@ -503,7 +503,7 @@ namespace Nox.ModLoader.Cores.Assets {
 		}
 
 		public async UniTask UnloadWorld(ResourceIdentifier path) {
-			path = AssetAPIExtension.Resolve(path, _kernelMod);
+			path = AssetAPIExtension.Resolve(path, _mod);
 			// unload on Internal mod
 			if (IsLoadedInternalWorld(path)) {
 				await UnloadInternalWorld(path);
@@ -511,7 +511,7 @@ namespace Nox.ModLoader.Cores.Assets {
 			}
 
 			// unload on other mods
-			foreach (var m in AssetAPIExtension.GetOtherLoadedMods(_kernelMod, path.Namespace)
+			foreach (var m in AssetAPIExtension.GetOtherLoadedMods(_mod, path.Namespace)
 				.Where(m => m.AssetAPI.IsLoadedInternalWorld(path))) {
 				await m.AssetAPI.UnloadInternalWorld(path);
 				return;
@@ -524,12 +524,12 @@ namespace Nox.ModLoader.Cores.Assets {
 		}
 
 		public bool IsLoadedWorld(ResourceIdentifier path) {
-			path = AssetAPIExtension.Resolve(path, _kernelMod);
+			path = AssetAPIExtension.Resolve(path, _mod);
 			if (IsLoadedInternalWorld(path))
 				return true;
 
 			// get on other mods
-			if (AssetAPIExtension.GetOtherLoadedMods(_kernelMod, path.Namespace)
+			if (AssetAPIExtension.GetOtherLoadedMods(_mod, path.Namespace)
 				.Any(m => m.AssetAPI.IsLoadedInternalWorld(path)))
 				return true;
 
@@ -539,11 +539,11 @@ namespace Nox.ModLoader.Cores.Assets {
 		}
 
 		public async UniTask<Scene> LoadInternalWorld(ResourceIdentifier path, LoadSceneMode mode = LoadSceneMode.Single) {
-			path = AssetAPIExtension.Resolve(path, _kernelMod);
+			path = AssetAPIExtension.Resolve(path, _mod);
 			var namespaces = AssetAPIExtension.GetNamespaces(path);
 
 			foreach (var n in namespaces) {
-				var dirpath   = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
+				var dirpath   = ToRelative(Path.Combine(_mod.GetData<string>("assets"), n, path.Path));
 				var scenePath = FindScenePath(dirpath);
 				if (scenePath == null)
 					continue;
@@ -578,11 +578,11 @@ namespace Nox.ModLoader.Cores.Assets {
 		}
 
 		public async UniTask UnloadInternalWorld(ResourceIdentifier path) {
-			path = AssetAPIExtension.Resolve(path, _kernelMod);
+			path = AssetAPIExtension.Resolve(path, _mod);
 			var namespaces = AssetAPIExtension.GetNamespaces(path);
 
 			foreach (var n in namespaces) {
-				var dirpath   = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
+				var dirpath   = ToRelative(Path.Combine(_mod.GetData<string>("assets"), n, path.Path));
 				var scenePath = FindScenePath(dirpath);
 				if (scenePath == null)
 					continue;
@@ -603,11 +603,11 @@ namespace Nox.ModLoader.Cores.Assets {
 		}
 
 		public bool HasInternalWorld(ResourceIdentifier path) {
-			path = AssetAPIExtension.Resolve(path, _kernelMod);
+			path = AssetAPIExtension.Resolve(path, _mod);
 			var namespaces = AssetAPIExtension.GetNamespaces(path);
 
 			foreach (var n in namespaces) {
-				var dirpath = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
+				var dirpath = ToRelative(Path.Combine(_mod.GetData<string>("assets"), n, path.Path));
 				if (FindScenePath(dirpath) != null)
 					return true;
 			}
@@ -616,11 +616,11 @@ namespace Nox.ModLoader.Cores.Assets {
 		}
 
 		public bool IsLoadedInternalWorld(ResourceIdentifier path) {
-			path = AssetAPIExtension.Resolve(path, _kernelMod);
+			path = AssetAPIExtension.Resolve(path, _mod);
 			var namespaces = AssetAPIExtension.GetNamespaces(path);
 
 			foreach (var n in namespaces) {
-				var dirpath   = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
+				var dirpath   = ToRelative(Path.Combine(_mod.GetData<string>("assets"), n, path.Path));
 				var scenePath = FindScenePath(dirpath);
 				if (scenePath == null)
 					continue;
@@ -631,11 +631,11 @@ namespace Nox.ModLoader.Cores.Assets {
 		}
 
 		public Scene GetInternalWorld(ResourceIdentifier path) {
-			path = AssetAPIExtension.Resolve(path, _kernelMod);
+			path = AssetAPIExtension.Resolve(path, _mod);
 			var namespaces = AssetAPIExtension.GetNamespaces(path);
 
 			foreach (var n in namespaces) {
-				var dirpath   = ToRelative(Path.Combine(_kernelMod.GetData<string>("assets"), n, path.Path));
+				var dirpath   = ToRelative(Path.Combine(_mod.GetData<string>("assets"), n, path.Path));
 				var scenePath = FindScenePath(dirpath);
 				if (scenePath == null)
 					continue;
