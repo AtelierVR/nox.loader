@@ -10,7 +10,7 @@ using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.ModLoader {
 	public static class ModManager {
-		public static List<Mod> Mods { get; private set; } = new();
+		public static List<Mod> Mods { get; } = new();
 		private static bool _initialized;
 
 		/// <summary>
@@ -37,10 +37,10 @@ namespace Nox.ModLoader {
 		}
 
 		public static IReadOnlyList<Mod> GetMods()
-			=> Mods ?? (IReadOnlyList<Mod>)Array.Empty<Mod>();
+			=> Mods;
 
 		public static Mod GetMod(string id) {
-			if (string.IsNullOrEmpty(id) || Mods == null)
+			if (string.IsNullOrEmpty(id))
 				return null;
 
 			for (var i = 0; i < Mods.Count; i++) {
