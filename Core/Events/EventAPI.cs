@@ -1,14 +1,16 @@
 using System;
 using System.Collections.Generic;
 using Nox.CCK.Mods;
+using Nox.CCK.Mods.Events;
 using Nox.CCK.Utils;
+using Nox.ModLoader.Mods;
 
 
 namespace Nox.ModLoader.Cores.Events {
 
-    public class EventAPI : CCK.Mods.Events.IEventAPI {
-        private readonly ModLoader.Mods.Mod _mod;
-        private readonly CCK.Mods.Events.EventEntryFlags _channel;
+    public class EventAPI : IEventAPI {
+        private readonly Mod _mod;
+        private readonly EventEntryFlags _channel;
         /// <summary>
         /// Subscriptions, copy-on-write: every mutation replaces the array instead of editing it in
         /// place. A dispatch can therefore iterate it directly — no snapshot allocation, and no
@@ -16,16 +18,22 @@ namespace Nox.ModLoader.Cores.Events {
         /// </summary>
         private EventSubscription[] _subscriptions = Array.Empty<EventSubscription>();
 
-        internal EventAPI(ModLoader.Mods.Mod mod, CCK.Mods.Events.EventEntryFlags channel) {
+        internal EventAPI(Mod mod, EventEntryFlags channel) {
             _mod = mod;
             _channel = channel;
         }
 
         // ReSharper disable Unity.PerformanceAnalysis
-        private void Receive(EventContext context) {
+        private void Receive(
+			CCK.Mods.Events.EventContext context,
+			ModLoader.Mods.Mod source,
+			CCK.Mods.Events.EventEntryFlags channel
+		) {
             // Copy-on-write: the field is never edited in place, so reading it into a local gives the
             // dispatch a stable view of the subscriptions for its whole duration.
             var subscriptions = _subscriptions;
+            if (subscriptions.Length == 0)
+                return;
 
             // The payload is built on the first interested subscriber only. An Emit is broadcast to
             // every mod, so building it up-front allocated one EventData per mod per event even when
@@ -37,9 +45,9 @@ namespace Nox.ModLoader.Cores.Events {
                     data ??= new EventData {
                             EventName        = context.EventName,
                             Data             = context.Data,
-                            InternalSource   = context.Source,
-                            SourceChannel    = context.Channel,
-                            CallbackFunction = context.Callback ?? (_ => _mod.CoreAPI.LoggerAPI.LogDebug($"Event {context.EventName} had no callback function set."))
+                            InternalSource   = source,
+                            SourceChannel    = channel,
+                            CallbackFunction = context.Callback ?? NoCallback
                         };
 
                     try {
@@ -51,21 +59,36 @@ namespace Nox.ModLoader.Cores.Events {
                 }
         }
 
-        private void Emit(EventContext context) {
-            var ctx = new EventContext(context) { CurrentChannel = _channel, Source = _mod };
-            var mod = context.Destination != null ? ModManager.GetMod(context.Destination) : null;
-            if (mod != null) mod.CoreAPI.EventAPI.Receive(ctx);
-            else
-                foreach (var imod in ModManager.GetMods())
-                    if (context.Channel.HasFlag(CCK.Mods.Events.EventEntryFlags.Main))
-                        imod.CoreAPI?.EventAPI.Receive(ctx);
+        private static readonly Action<object[]> NoCallback = _ => { };
+
+        private void Emit(
+			CCK.Mods.Events.EventContext context,
+			ModLoader.Mods.Mod source,
+			CCK.Mods.Events.EventEntryFlags channel
+		) {
+            if (context.Destination != null) {
+                var destination = ModManager.GetMod(context.Destination);
+                if (destination != null)
+                    destination.CoreAPI?.EventAPI.Receive(context, source, channel);
+                return;
+            }
+
+            if (!context.Channel.HasFlag(EventEntryFlags.Main))
+                return;
+
+            var mods = ModManager.Mods;
+            if (mods == null)
+                return;
+
+            for (var i = 0; i < mods.Count; i++)
+                mods[i].CoreAPI?.EventAPI.Receive(context, source, channel);
         }
 
         public void Emit(CCK.Mods.Events.EventContext context)
-            => Emit(new EventContext(context));
+            => Emit(context, _mod, _channel);
 
         public void Emit(Dictionary<string, object> context)
-            => Emit(EventContext.From(context));
+            => Emit(EventContext.From(context), _mod, _channel);
 
 
         public void Emit(string eventName)
@@ -73,19 +96,19 @@ namespace Nox.ModLoader.Cores.Events {
 
         public void Emit(string eventName, params object[] data) {
             data ??= Array.Empty<object>();
-            if (data.Length > 0 && data[^1] is Action<object[]>)
+            if (data.Length > 0 && data[^1] is Action<object[]> callback)
                 Emit(
                     new EventContext {
                         Data = data.Length > 1 ? data[..^1] : Array.Empty<object>(), Destination = null, EventName = eventName, Source = _mod,
-                        CurrentChannel = _channel, Channel = _channel, Callback = data[^1] as Action<object[]>
-                    }
+                        CurrentChannel = _channel, Channel = _channel, Callback = callback
+                    }, _mod, _channel
                 );
             else
                 Emit(
                     new EventContext {
                         Data = data, Destination = null, EventName = eventName, Source = _mod,
-                        CurrentChannel = _channel, Channel = _channel, Callback = _ => { }
-                    }
+                        CurrentChannel = _channel, Channel = _channel, Callback = NoCallback
+                    }, _mod, _channel
                 );
         }
 
